@@ -2,9 +2,9 @@ import pytest
 from src.main import Catalog
 
 
-catalogs = ['kubota',]    # 'grimme'
+catalog_names = ['kubota']    # 'grimme'
 
-for catalog_name in catalogs:
+for catalog_name in catalog_names:
     Catalog(name=catalog_name)
 
 
@@ -20,7 +20,11 @@ class TestCatalog:
             response = catalog.get_category(category_id=category.id)
             assert response.status_code == 200
 
-
+    def test_part(self, catalog):
+        for category in catalog.categories:
+            for part_id in category.parts:
+                response = catalog.get_part(part_id=part_id)
+                assert response.status_code == 200
 
 
 
