@@ -1,7 +1,7 @@
 import pytest
 from src.main import Catalog, Category
 
-catalog_names = ['kubota']    # 'grimme'
+catalog_names = ['lemken']    # 'grimme'
 
 for catalog_name in catalog_names:
     Catalog(name=catalog_name)
@@ -15,16 +15,42 @@ class TestCatalog:
         response = catalog.get_tree()
 
         if response.status_code == 200:
-            categories = response.json().get('data')
-            if categories:
-                for category in categories:
+            data = response.json().get('data')
+            if data:
+                for category in data:
+                    validation_fields = set()
+
+                    if catalog.name == 'lemken':
+                        validation_fields = {
+                            'id', 'name', 'parent_id', 'link_type', 'children',
+                            'created_at', 'updated_at', 'position', 'description',
+                            'remark', 'imageFields',
+                        }
+
+                        validation_image_fields = {'name', 's3'}
+
+                        image_fields = category.get('imageFields')
+                        if image_fields:
+                            image_missing_fields = validation_image_fields - image_fields.keys()
+
+                            if image_missing_fields:
+                                assert image_missing_fields, f'Missing fields  {image_missing_fields} in imageFields => in {catalog.name} category_id: {category.id}'
+                        else:
+                            assert image_fields, f'Not Image_fields in {catalog.name} category_id: {category.id}'
+
+                    missing_fields = validation_fields - category.keys()
+
+                    if missing_fields:
+                        assert missing_fields, f'Missing fields {missing_fields} in {catalog.name} category_id: {category.id}'
+
                     category_id = category.get('id')
                     obj = Category(category_id=category_id)
                     catalog.categories.append(obj)
             else:
-                assert categories, 'Note Categories'
+                assert data, f'Note Categories in {catalog.name}'
         else:
-            assert response.status_code == 200, f'Bad request {response.status_code}'
+            error_message = response.json().get('message')
+            assert response.status_code == 200, f'Bad request {catalog.name}: {error_message}'
 
     @pytest.mark.dependency(depends=["test_tree"])
     def test_category(self, catalog):
@@ -50,16 +76,16 @@ class TestCatalog:
                                         for part in data:
                                             part_id = part.get('id')
                                             category.parts.append(part_id)
-                                    else:
-                                        assert data, 'Note Part List Data'
                                 else:
-                                    assert response.status_code == 200, f'Bad request {response.status_code}'
+                                    error_message = response.json().get('message')
+                                    assert response.status_code == 200, f'Bad request in {catalog.name} category_id: {category.id} : {error_message}'
                         else:
-                            assert children, 'No children(Parts list) in category data'
+                            assert children, f'No children(Parts list) in {catalog.name} category_id: {category.id} data'
                 else:
-                    assert data, 'Note Category Data'
+                    assert data, f'Note Category Data in {catalog.name} category_id: {category.id}'
             else:
-                assert response.status_code == 200, f'Bad request {response.status_code}'
+                error_message = response.json().get('message')
+                assert response.status_code == 200, f'Bad request {catalog.name}: {error_message}'
 
     @pytest.mark.dependency(depends=["test_category"])
     def test_part(self, catalog):
@@ -68,9 +94,46 @@ class TestCatalog:
                 response = catalog.get_part(part_id=part_id)
 
                 if response.status_code == 200:
-                    pass
+                    data = response.json().get('data')
+                    part_category = response.json().get('category')
+
+                    if data:
+                        validation_fields = {
+                            'id', 'name', 'link_type', 'quantity',
+                            'part_number', 'position', 'dimension',
+                            'imageFields', 'created_at', 'updated_at',
+                        }
+
+                        missing_fields = validation_fields - data.keys()
+
+                        if missing_fields:
+                            assert missing_fields, f'Missing fields {missing_fields} in {catalog.name} category_id: {category.id} part_id: {part_id}'
+                        else:
+                            image_fields = data.get('imageFields')
+
+                            if image_fields:
+                                validation_image_fields = {'name', 's3'}
+                                image_missing_fields = validation_image_fields - image_fields.keys()
+
+                                if image_missing_fields:
+                                    assert image_missing_fields, f'Missing fields  {image_missing_fields} in imageFields => in {catalog.name} category_id: {category.id} part_id: {part_id}'
+                            else:
+                                assert image_fields, f'Not Image_fields in {catalog.name} category_id: {category.id} part_id: {part_id}'
+                    else:
+                        assert data, f'Note data_field in {catalog.name} category_id: {category.id} Part_id: {part_id})'
+
+                    if part_category:
+                        validation_fields = {'id'}
+                        missing_fields = validation_fields - part_category.keys()
+
+                        if missing_fields:
+                            assert missing_fields, f'Missing fields {missing_fields} in {catalog.name} category_id: {category.id} part_id: {part_id}'
+                    else:
+                        assert part_category, f'Note category_field in {catalog.name} category_id: {category.id} Part_id: {part_id})'
+
                 else:
-                    assert response.status_code == 200, f'Bad request {response.status_code}'
+                    error_message = response.json().get('message')
+                    assert response.status_code == 200, f'Bad request {catalog.name} category_id: {category.id} part_id: {part_id}: {error_message}'
 
 
 
