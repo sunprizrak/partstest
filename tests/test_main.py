@@ -54,12 +54,10 @@ class TestCatalog:
                                         assert data, 'Note Part List Data'
                                 else:
                                     assert response.status_code == 200, f'Bad request {response.status_code}'
-
                         else:
                             assert children, 'No children(Parts list) in category data'
                 else:
                     assert data, 'Note Category Data'
-
             else:
                 assert response.status_code == 200, f'Bad request {response.status_code}'
 
