@@ -10,7 +10,7 @@ for catalog_name in catalog_names:
 @pytest.mark.parametrize('catalog', Catalog.objects)
 class TestCatalog:
 
-    # @pytest.mark.dependency(name="test_tree")
+    @pytest.mark.dependency(name="test_tree")
     def test_tree(self, catalog):
         response = catalog.get_tree()
 
