@@ -1,7 +1,7 @@
 import pytest
 from src.main import Catalog, Category
 
-catalog_names = ['lemken']    # 'grimme'
+catalog_names = ['claas']    # 'grimme'
 
 for catalog_name in catalog_names:
     Catalog(name=catalog_name)
@@ -28,20 +28,28 @@ class TestCatalog:
                         }
 
                         validation_image_fields = {'name', 's3'}
-
                         image_fields = category.get('imageFields')
+
                         if image_fields:
                             image_missing_fields = validation_image_fields - image_fields.keys()
 
-                            if image_missing_fields:
-                                assert image_missing_fields, f'Missing fields  {image_missing_fields} in imageFields => in {catalog.name} category_id: {category.id}'
+                            assert not image_missing_fields, f'Missing fields  {image_missing_fields} in imageFields => in {catalog.name}'
                         else:
-                            assert image_fields, f'Not Image_fields in {catalog.name} category_id: {category.id}'
+                            assert image_fields, f'Not Image_fields in {catalog.name}'
+                    elif catalog.name == 'grimme':
+                        validation_fields = {
+                            'id', 'label', 'parent_id', 'linkType',
+                            'children', 'created_at', 'updated_at',
+                        }
+                    elif catalog.name == 'claas':
+                        validation_fields = {
+                            'id', 'name', 'parent_id', 'link_type',
+                            'depth', 'children', 'created_at', 'updated_at',
+                        }
 
                     missing_fields = validation_fields - category.keys()
 
-                    if missing_fields:
-                        assert missing_fields, f'Missing fields {missing_fields} in {catalog.name} category_id: {category.id}'
+                    assert not missing_fields, f'Missing fields {missing_fields} in {catalog.name}'
 
                     category_id = category.get('id')
                     obj = Category(category_id=category_id)
@@ -78,7 +86,7 @@ class TestCatalog:
                                             category.parts.append(part_id)
                                 else:
                                     error_message = response.json().get('message')
-                                    assert response.status_code == 200, f'Bad request in {catalog.name} category_id: {category.id} : {error_message}'
+                                    assert response.status_code == 200, f'Bad request in {catalog.name} category_id: {category.id} external_id(part list): {external_id} : {error_message}'
                         else:
                             assert children, f'No children(Parts list) in {catalog.name} category_id: {category.id} data'
                 else:
@@ -87,10 +95,11 @@ class TestCatalog:
                 error_message = response.json().get('message')
                 assert response.status_code == 200, f'Bad request {catalog.name}: {error_message}'
 
-    @pytest.mark.dependency(depends=["test_category"])
+    # @pytest.mark.dependency(depends=["test_category"])
     def test_part(self, catalog):
         for category in catalog.categories:
             for part_id in category.parts:
+                print(part_id)
                 response = catalog.get_part(part_id=part_id)
 
                 if response.status_code == 200:
@@ -107,7 +116,7 @@ class TestCatalog:
                         missing_fields = validation_fields - data.keys()
 
                         if missing_fields:
-                            assert missing_fields, f'Missing fields {missing_fields} in {catalog.name} category_id: {category.id} part_id: {part_id}'
+                            assert not missing_fields, f'Missing fields {missing_fields} in {catalog.name} category_id: {category.id} part_id: {part_id}'
                         else:
                             image_fields = data.get('imageFields')
 
@@ -115,8 +124,7 @@ class TestCatalog:
                                 validation_image_fields = {'name', 's3'}
                                 image_missing_fields = validation_image_fields - image_fields.keys()
 
-                                if image_missing_fields:
-                                    assert image_missing_fields, f'Missing fields  {image_missing_fields} in imageFields => in {catalog.name} category_id: {category.id} part_id: {part_id}'
+                                assert not image_missing_fields, f'Missing fields  {image_missing_fields} in imageFields => in {catalog.name} category_id: {category.id} part_id: {part_id}'
                             else:
                                 assert image_fields, f'Not Image_fields in {catalog.name} category_id: {category.id} part_id: {part_id}'
                     else:
@@ -126,8 +134,7 @@ class TestCatalog:
                         validation_fields = {'id'}
                         missing_fields = validation_fields - part_category.keys()
 
-                        if missing_fields:
-                            assert missing_fields, f'Missing fields {missing_fields} in {catalog.name} category_id: {category.id} part_id: {part_id}'
+                        assert not missing_fields, f'Missing fields {missing_fields} in {catalog.name} category_id: {category.id} part_id: {part_id}'
                     else:
                         assert part_category, f'Note category_field in {catalog.name} category_id: {category.id} Part_id: {part_id})'
 

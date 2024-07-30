@@ -44,11 +44,14 @@ class Category:
 
 
 if __name__ == '__main__':
-    catalog = Catalog(name='lemken')
-    # response = catalog.get_parts(external_id=181010)
-    # print(response.json())
-    response = catalog.get_part(part_id=251166)
-    for key, val in response.json().items():
-        print(f'{key}: {val}')
+    catalog = Catalog(name='claas')
+    response = catalog.get_parts(external_id='Зерноуборочные_комбайны/LEXION/LEXION 8900-8600 GEN 1 (C86)')
+    print(response.json().get('message'))
+    # data = response.json().get('data')
+    # for el in data[0]:
+    #     print(el)
+    # response = catalog.get_part(part_id=251166)
+    # for key, val in response.json().items():
+    #     print(f'{key}: {val}')
 
 
