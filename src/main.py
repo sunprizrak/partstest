@@ -1,17 +1,12 @@
 import requests
 
 
-catalog_names = ['claas']
-
-
 class Catalog:
     api_url = 'http://api.catalog.detalum.ru/api/v1'
-    objects = []
 
     def __init__(self, name):
         self.name = name
         self.categories = []
-        self.objects.append(self)
 
     def get_tree(self):
         resp = requests.get(
@@ -46,16 +41,14 @@ class Category:
         self.parts = []
 
 
-for catalog_name in catalog_names:
-    Catalog(name=catalog_name)
-
-
 if __name__ == '__main__':
     catalog = Catalog(name='claas')
     response = catalog.get_parts(external_id='Зерноуборочные_комбайны/LEXION/LEXION 8900-8600 GEN 1 (C86)')
-    print(response.json().get('message'))
+    print(response.json())
+    print(response.json())
+    # response = catalog.get_tree()
     # data = response.json().get('data')
-    # for el in data[0]:
+    # for el in data:
     #     print(el)
     # response = catalog.get_part(part_id=251166)
     # for key, val in response.json().items():
