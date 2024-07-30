@@ -1,11 +1,6 @@
 import pytest
 from src.main import Catalog, Category
 
-catalog_names = ['claas']    # 'grimme'
-
-for catalog_name in catalog_names:
-    Catalog(name=catalog_name)
-
 
 @pytest.mark.parametrize('catalog', Catalog.objects)
 class TestCatalog:

@@ -1,6 +1,9 @@
 import requests
 
 
+catalog_names = ['claas']
+
+
 class Catalog:
     api_url = 'http://api.catalog.detalum.ru/api/v1'
     objects = []
@@ -41,6 +44,10 @@ class Category:
         self.id = category_id
         self.parts_list = []
         self.parts = []
+
+
+for catalog_name in catalog_names:
+    Catalog(name=catalog_name)
 
 
 if __name__ == '__main__':
