@@ -10,7 +10,7 @@ for catalog_name in catalog_names:
 @pytest.mark.parametrize('catalog', Catalog.objects)
 class TestCatalog:
 
-    @pytest.mark.dependency(name="test_tree")
+    # @pytest.mark.dependency(name="test_tree")
     def test_tree(self, catalog):
         response = catalog.get_tree()
 
@@ -95,11 +95,10 @@ class TestCatalog:
                 error_message = response.json().get('message')
                 assert response.status_code == 200, f'Bad request {catalog.name}: {error_message}'
 
-    # @pytest.mark.dependency(depends=["test_category"])
+    @pytest.mark.dependency(depends=["test_category"])
     def test_part(self, catalog):
         for category in catalog.categories:
             for part_id in category.parts:
-                print(part_id)
                 response = catalog.get_part(part_id=part_id)
 
                 if response.status_code == 200:
