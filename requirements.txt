@@ -1,3 +1,4 @@
 pytest
 pytest-dependency
 requests
+progress

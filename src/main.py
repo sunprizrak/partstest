@@ -49,7 +49,7 @@ if __name__ == '__main__':
     # print(len(data))
     # for el in data:
     #     print(el.get('id'))
-    response = catalog.get_category(category_or_children_id=173896)
+    response = catalog.get_category(category_or_children_id=173898)
     data = response.json().get('data')
     for el in data:
         children = el.get('children')
