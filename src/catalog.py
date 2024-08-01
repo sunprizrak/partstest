@@ -10,6 +10,10 @@ class Catalog:
         self.categories = []
         self.parts = []
 
+    def add_category(self, category_id):
+        obj = Category(category_id=category_id)
+        self.categories.append(obj)
+
     def get_tree(self):
         url = f"{self.api_url}/{self.name}/catalog/tree"
         self.current_url = url
@@ -34,11 +38,17 @@ class Catalog:
         resp = requests.get(url)
         return resp
 
+    def __repr__(self):
+        return self.name
+
 
 class Category:
 
     def __init__(self, category_id):
         self.id = category_id
+
+    def __repr__(self):
+        return str(self.id)
 
 
 if __name__ == '__main__':
