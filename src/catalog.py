@@ -9,6 +9,7 @@ class Catalog:
         self.current_url = None
         self.categories = []
         self.parts = []
+        self.logger = None
 
     def add_category(self, category_id):
         obj = Category(category_id=category_id)
@@ -52,25 +53,17 @@ class Category:
 
 
 if __name__ == '__main__':
-    catalog = Catalog(name='lemken')
-    response = catalog.get_parts(child_id=173900)
+    catalog = Catalog(name='claas')
+    response = catalog.get_tree()
     data = response.json().get('data')
-    print(data)
-    # print(len(data))
-    # for el in data:
-    #     print(el.get('id'))
-    # response = catalog.get_category(category_or_children_id=173898)
-    # data = response.json().get('data')
-    # print(type(data))
-    #
-    # for el in data:
-    #     print(el.get('children'))
-    # for el in data:
-    #     children = el.get('children')
-    #     for el in children:
-    #         print(el)
-    # response = catalog.get_part(part_id=251166)
-    # for key, val in response.json().items():
-    #     print(f'{key}: {val}')
+    children = data[0].get('children')
+    for el in children:
+        for key, val in el.items():
+            print(f'{key}: {val}')
+        print('------------------------')
+
+    response = catalog.get_parts(child_id=400)
+    print(response.json())
+
 
 

@@ -1,15 +1,8 @@
 import time
-import pytest
-import logging
 from progress.bar import IncrementalBar
 
 
-logger = logging.getLogger(__name__)
-
-
 class TestCatalog:
-
-    @pytest.mark.dependency(name="test_tree")
     def test_tree(self, catalog):
         response = catalog.get_tree()
 
@@ -37,58 +30,57 @@ class TestCatalog:
                             image_missing_fields = validation_image_fields - image_fields.keys()
 
                             if len(image_missing_fields) > 0:
-                                logger.warning(f'Missing fields  {image_missing_fields} in imageFields => in catalog: {catalog.name} category_id: {category_id}')
+                                catalog.logger.warning(f'Missing fields  {image_missing_fields} in imageFields => in catalog: {catalog.name} category_id: {category_id}')
                         else:
-                            logger.warning(f'No Image_fields in catalog: {catalog.name} category_id: {category_id}')
+                            catalog.logger.warning(f'No Image_fields in catalog: {catalog.name} category_id: {category_id}')
                     elif catalog.name == 'grimme':
                         validation_fields = {
                             'id', 'label', 'parent_id', 'linkType',
                             'children', 'created_at', 'updated_at',
                         }
-                    elif catalog.name == 'claas':  #depth
+                    elif catalog.name == 'claas':
                         validation_fields = {
                             'id', 'name', 'parent_id', 'link_type',
                             'children', 'created_at', 'updated_at',
+                            'depth',
                         }
 
                     missing_fields = validation_fields - category.keys()
 
                     if len(missing_fields) > 0:
-                        logger.warning(f'Missing fields {missing_fields} in catalog: {catalog.name} category_id: {category_id}')
+                        catalog.logger.warning(f'Missing fields {missing_fields} in catalog: {catalog.name} category_id: {category_id}')
 
                     catalog.add_category(category_id=category_id)
                 bar.finish()
             else:
-                logger.warning(f'No data in {catalog.name} {catalog.current_url}')
+                catalog.logger.warning(f'No data in {catalog.name} {catalog.current_url}')
         else:
-            logger.warning(f'Bad request {catalog.name} {catalog.current_url}')
+            catalog.logger.warning(f'Bad request {catalog.name} {catalog.current_url}')
 
-    @pytest.mark.dependency(name='test_category', depends=["test_tree"])
-    def test_category(self, catalog):
         if catalog.categories:
             main_parts_list_ids = []
 
-            bar = IncrementalBar(f'receive categories data from {catalog.name} ', max=len(catalog.categories[-1:]), suffix='%(index)d/%(max)d ')
-            for category in catalog.categories[-1:]:
+            bar = IncrementalBar(f'receive categories data from {catalog.name} ', max=len(catalog.categories[-2:-1]), suffix='%(index)d/%(max)d ')
+            for category in catalog.categories[-2:-1]:
                 bar.next()
                 time.sleep(0.1)
                 response = catalog.get_category(category_or_children_id=category.id)
 
                 if response.status_code != 200:
-                    logger.warning(f'Bad request catalog: {catalog.name} category_id: {category.id} {catalog.current_url}')
+                    catalog.logger.warning(f'Bad request catalog: {catalog.name} category_id: {category.id} {catalog.current_url}')
                     continue
 
                 data = response.json().get('data')
 
                 if not data:
-                    logger.warning(f'Note data in catalog: {catalog.name} category_id: {category.id}')
+                    catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category.id}')
                     continue
 
                 for el in data:
                     children = el.get('children')
 
                     if not children:
-                        logger.warning(f'No children in data catalog: {catalog.name} category_id: {category.id}')
+                        catalog.logger.warning(f'No children in data catalog: {catalog.name} category_id: {category.id}')
                         continue
 
                     for child in children:
@@ -104,20 +96,20 @@ class TestCatalog:
                 response = catalog.get_category(category_or_children_id=part_list_id)
 
                 if response.status_code != 200:
-                    logger.warning(f'Bad request catalog: {catalog.name} part_list_id: {part_list_id} {catalog.current_url}')
+                    catalog.logger.warning(f'Bad request catalog: {catalog.name} part_list_id: {part_list_id} {catalog.current_url}')
                     continue
 
                 data = response.json().get('data')
 
                 if not data:
-                    logger.warning(f'No data in catalog: {catalog.name} main_part_list_id: {part_list_id}')
+                    catalog.logger.warning(f'No data in catalog: {catalog.name} main_part_list_id: {part_list_id}')
                     continue
 
                 for el in data:
                     children = el.get('children')
 
                     if not children:
-                        logger.warning(f'No children in data catalog: {catalog.name} main_part_list_id: {part_list_id}')
+                        catalog.logger.warning(f'No children in data catalog: {catalog.name} main_part_list_id: {part_list_id}')
                         continue
 
                     for child in children:
@@ -131,13 +123,13 @@ class TestCatalog:
                 response = catalog.get_parts(child_id=part_list_id)
 
                 if response.status_code != 200:
-                    logger.warning(f'Bad request catalog: {catalog.name} part_list_id: {part_list_id} {catalog.current_url}')
+                    catalog.logger.warning(f'Bad request catalog: {catalog.name} part_list_id: {part_list_id} {catalog.current_url}')
                     continue
 
                 data = response.json().get('data')
 
                 if not data:
-                    logger.warning(f'No Parts in {catalog.name} part_list_id: {part_list_id}')
+                    catalog.logger.warning(f'No Parts in {catalog.name} part_list_id: {part_list_id}')
                     continue
 
                 for part in data:
@@ -146,10 +138,9 @@ class TestCatalog:
 
             bar.finish()
         else:
-            logger.warning(f'No Categories in {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog.name}')
 
-    @pytest.mark.dependency(depends=["test_category"])
-    def test_part(self, catalog):
+    def test_parts(self, catalog):
         if catalog.parts:
             bar = IncrementalBar(f'check fields in detail', max=len(catalog.parts), suffix='%(index)d/%(max)d ')
             for part_id in catalog.parts:
@@ -157,13 +148,13 @@ class TestCatalog:
                 response = catalog.get_part(part_id=part_id)
 
                 if response.status_code != 200:
-                    logger.warning(f'Bad request catalog: {catalog.name} part_id: {part_id} {catalog.current_url}')
+                    catalog.logger.warning(f'Bad request catalog: {catalog.name} part_id: {part_id} {catalog.current_url}')
                     continue
 
                 data = response.json().get('data')
 
                 if not data:
-                    logger.warning(f'No data in {catalog.name} Part_id: {part_id})')
+                    catalog.logger.warning(f'No data in {catalog.name} Part_id: {part_id})')
                     continue
 
                 validation_fields = {
@@ -175,7 +166,7 @@ class TestCatalog:
                 missing_fields = validation_fields - data.keys()
 
                 if len(missing_fields) > 0:
-                    logger.warning(f'Missing fields {missing_fields} in {catalog.name} part_id: {part_id}')
+                    catalog.logger.warning(f'Missing fields {missing_fields} in {catalog.name} part_id: {part_id}')
 
                 image_fields = data.get('imageFields')
 
@@ -185,9 +176,9 @@ class TestCatalog:
                     image_missing_fields = validation_image_fields - image_fields.keys()
 
                     if len(image_missing_fields) > 0:
-                        logger.warning(f'Missing fields  {image_missing_fields} in imageFields => in {catalog.name} part_id: {part_id}')
+                        catalog.logger.warning(f'Missing fields  {image_missing_fields} in imageFields => in {catalog.name} part_id: {part_id}')
                 else:
-                    logger.warning(f'Not Image_fields in {catalog.name} part_id: {part_id}')
+                    catalog.logger.warning(f'Not Image_fields in {catalog.name} part_id: {part_id}')
 
                 part_category = response.json().get('category')
 
@@ -196,12 +187,12 @@ class TestCatalog:
                     missing_fields = validation_fields - part_category.keys()
 
                     if len(missing_fields) > 0:
-                        logger.warning(f'Missing fields {missing_fields} in {catalog.name} part_id: {part_id}')
+                        catalog.logger.warning(f'Missing fields {missing_fields} in {catalog.name} part_id: {part_id}')
                 else:
-                    logger.warning(f'No part_category in {catalog.name} part_id: {part_id}')
+                    catalog.logger.warning(f'No part_category in {catalog.name} part_id: {part_id}')
             bar.finish()
         else:
-            logger.warning(f'No parts in catalog: {catalog.name}')
+            catalog.logger.warning(f'No parts in catalog: {catalog.name}')
 
 
 
