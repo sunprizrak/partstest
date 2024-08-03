@@ -10,46 +10,12 @@ class TestCatalog:
             data = response.json().get('data')
             if data:
                 bar = IncrementalBar(f'{catalog.name} categories', max=len(data), suffix='%(index)d/%(max)d ')
-                for category in data:
+                for category_data in data:
                     bar.next()
                     time.sleep(0.2)
-                    category_id = category.get('id')
-                    validation_fields = set()
+                    category_id = category_data.get('id')
 
-                    if catalog.name == 'lemken':
-                        validation_fields = {
-                            'id', 'name', 'parent_id', 'link_type', 'children',
-                            'created_at', 'updated_at', 'position', 'description',
-                            'remark', 'imageFields',
-                        }
-
-                        validation_image_fields = {'name', 's3'}
-                        image_fields = category.get('imageFields')
-
-                        if image_fields:
-                            image_missing_fields = validation_image_fields - image_fields.keys()
-
-                            if len(image_missing_fields) > 0:
-                                catalog.logger.warning(f'Missing fields  {image_missing_fields} in imageFields => in catalog: {catalog.name} category_id: {category_id}')
-                        else:
-                            catalog.logger.warning(f'No Image_fields in catalog: {catalog.name} category_id: {category_id}')
-                    elif catalog.name == 'grimme':
-                        validation_fields = {
-                            'id', 'label', 'parent_id', 'linkType',
-                            'children', 'created_at', 'updated_at',
-                        }
-                    elif catalog.name == 'claas':
-                        validation_fields = {
-                            'id', 'name', 'parent_id', 'link_type',
-                            'children', 'created_at', 'updated_at',
-                            'depth',
-                        }
-
-                    missing_fields = validation_fields - category.keys()
-
-                    if len(missing_fields) > 0:
-                        catalog.logger.warning(f'Missing fields {missing_fields} in catalog: {catalog.name} category_id: {category_id}')
-
+                    catalog.validate(data=category_data)
                     catalog.add_category(category_id=category_id)
                 bar.finish()
             else:
@@ -61,26 +27,26 @@ class TestCatalog:
             main_parts_list_ids = []
 
             bar = IncrementalBar(f'receive categories data from {catalog.name} ', max=len(catalog.categories[-2:-1]), suffix='%(index)d/%(max)d ')
-            for category in catalog.categories[-2:-1]:
+            for category_id in catalog.categories[-2:-1]:
                 bar.next()
                 time.sleep(0.1)
-                response = catalog.get_category(category_or_children_id=category.id)
+                response = catalog.get_category(category_or_children_id=category_id)
 
                 if response.status_code != 200:
-                    catalog.logger.warning(f'Bad request catalog: {catalog.name} category_id: {category.id} {catalog.current_url}')
+                    catalog.logger.warning(f'Bad request catalog: {catalog.name} category_id: {category_id} {catalog.current_url}')
                     continue
 
                 data = response.json().get('data')
 
                 if not data:
-                    catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category.id}')
+                    catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category_id}')
                     continue
 
                 for el in data:
                     children = el.get('children')
 
                     if not children:
-                        catalog.logger.warning(f'No children in data catalog: {catalog.name} category_id: {category.id}')
+                        catalog.logger.warning(f'No children in data catalog: {catalog.name} category_id: {category_id}')
                         continue
 
                     for child in children:
@@ -134,7 +100,7 @@ class TestCatalog:
 
                 for part in data:
                     part_id = part.get('id')
-                    catalog.parts.append(part_id)
+                    catalog.add_part(part_id=part_id)
 
             bar.finish()
         else:

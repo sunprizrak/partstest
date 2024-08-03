@@ -1,19 +1,54 @@
 import requests
+import os
+import logging
+from datetime import datetime
+from abc import ABC, abstractmethod
 
 
-class Catalog:
+class Catalog(ABC):
     api_url = 'http://api.catalog.detalum.ru/api/v1'
 
-    def __init__(self, name):
-        self.name = name
-        self.current_url = None
+    def __init__(self):
+        self.name = self.__class__.__name__.lower()
         self.categories = []
         self.parts = []
-        self.logger = None
+        self.current_url = None
+        self.validation_fields = set()
+        self.validation_image_fields = set()
+        self.logger = self.__setup_logger()
 
     def add_category(self, category_id):
-        obj = Category(category_id=category_id)
-        self.categories.append(obj)
+        self.categories.append(category_id)
+
+    def add_part(self, part_id):
+        self.parts.append(part_id)
+
+    def __setup_logger(self):
+        logs_dir = os.path.join('logs', self.name)
+
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir)
+
+        log_file = os.path.join(logs_dir, f"{self.name}_{datetime.now().strftime("%Y-%m-%d")}.log")
+
+        if os.path.exists(log_file):
+            os.remove(log_file)
+
+        logger = logging.getLogger(self.name)
+        logger.setLevel(logging.WARNING)
+
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.WARNING)
+
+        formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        file_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+        return logger
+
+    @abstractmethod
+    def validate(self, fields: dict):
+        pass
 
     def get_tree(self):
         url = f"{self.api_url}/{self.name}/catalog/tree"
@@ -43,27 +78,106 @@ class Catalog:
         return self.name
 
 
-class Category:
+class Lemken(Catalog):
 
-    def __init__(self, category_id):
-        self.id = category_id
+    def __init__(self):
+        super(Lemken, self).__init__()
+        self.validation_fields = {
+            'id', 'name', 'parent_id', 'link_type', 'children',
+            'created_at', 'updated_at', 'position', 'description',
+            'remark', 'imageFields',
+        }
+        self.validation_image_fields = {'name', 's3'}
 
-    def __repr__(self):
-        return str(self.id)
+    def validate(self, data: dict):
+        if data:
+            category_id = data.get('category_id')
+            image_fields = data.get('imageFields')
+
+            missing_fields = self.validation_fields - data.keys()
+
+            if len(missing_fields) > 0:
+                self.logger.warning(
+                    f"Missing fields {missing_fields} in catalog: {self.name} category_id: {category_id}")
+
+            if image_fields:
+                missing_fields = self.validation_image_fields - image_fields.keys()
+
+                if len(missing_fields) > 0:
+                    self.logger.warning(
+                        f"Missing fields  {missing_fields} in imageFields => in catalog: {self.name} category_id: {category_id}")
+
+
+class Kubota(Catalog):
+
+    def __init__(self):
+        super(Kubota, self).__init__()
+        self.validation_fields = {
+            'id', 'name', 'part_number', 'entity',
+            'link_type', 'parent_id', 'children',
+        }
+
+    def validate(self, data: dict):
+        if data:
+            category_id = data.get('category_id')
+
+            missing_fields = self.validation_fields - data.keys()
+
+            if len(missing_fields) > 0:
+                self.logger.warning(
+                    f"Missing fields {missing_fields} in catalog: {self.name} category_id: {category_id}")
+
+
+class Grimme(Catalog):
+
+    def __init__(self):
+        super(Grimme, self).__init__()
+        self.validation_fields = {
+            'id', 'label', 'parent_id', 'linkType',
+            'children', 'created_at', 'updated_at',
+        }
+
+    def validate(self, data: dict):
+        if data:
+            category_id = data.get('category_id')
+
+            missing_fields = self.validation_fields - data.keys()
+
+            if len(missing_fields) > 0:
+                self.logger.warning(
+                    f"Missing fields {missing_fields} in catalog: {self.name} category_id: {category_id}")
+
+
+class Claas(Catalog):
+    def __init__(self):
+        super(Claas, self).__init__()
+        self.validation_fields = {
+            'id', 'name', 'parent_id', 'link_type',
+            'children', 'created_at', 'updated_at',
+            'depth',
+        }
+
+    def validate(self, data: dict):
+        if data:
+            category_id = data.get('category_id')
+
+            missing_fields = self.validation_fields - data.keys()
+
+            if len(missing_fields) > 0:
+                self.logger.warning(
+                    f"Missing fields {missing_fields} in catalog: {self.name} category_id: {category_id}")
+
+
+def create_catalog_instance(catalog_name):
+    cls = globals().get(catalog_name.capitalize())
+    if cls is None:
+        raise ValueError(f"Class {catalog_name} is not defined.")
+    return cls()
 
 
 if __name__ == '__main__':
-    catalog = Catalog(name='claas')
-    response = catalog.get_tree()
-    data = response.json().get('data')
-    children = data[0].get('children')
-    for el in children:
-        for key, val in el.items():
-            print(f'{key}: {val}')
-        print('------------------------')
-
-    response = catalog.get_parts(child_id=400)
-    print(response.json())
+    catalog = create_catalog_instance(catalog_name='lemken')
+    print(catalog.name)
 
 
 
