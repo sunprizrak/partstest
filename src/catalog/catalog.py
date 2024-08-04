@@ -1,0 +1,110 @@
+import requests
+import os
+import logging
+from datetime import datetime
+from abc import ABC, abstractmethod
+from .category import create_category_instance
+
+
+class Catalog(ABC):
+    api_url = 'http://api.catalog.detalum.ru/api/v1'
+
+    def __init__(self, name):
+        self.name = name
+        self.categories = dict()
+        self.parts = []
+        self.current_url = None
+        self.validation_fields = set()
+        self.validation_image_fields = set()
+        self.logger = self.__setup_logger()
+
+    def add_category(self, category_id):
+        category = create_category_instance(catalog=self, category_id=category_id)
+        self.categories[category_id] = category
+
+    def add_part(self, part_id):
+        self.parts.append(part_id)
+
+    def __setup_logger(self):
+        logs_dir = os.path.join('logs', self.name)
+
+        if not os.path.exists(logs_dir):
+            os.makedirs(logs_dir)
+
+        log_file = os.path.join(logs_dir, f"{self.name}_{datetime.now().strftime("%Y-%m-%d")}.log")
+
+        if os.path.exists(log_file):
+            os.remove(log_file)
+
+        logger = logging.getLogger(self.name)
+        logger.setLevel(logging.WARNING)
+
+        file_handler = logging.FileHandler(log_file)
+        file_handler.setLevel(logging.WARNING)
+
+        formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+        file_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+        return logger
+
+    def get_tree(self):
+        url = f"{self.api_url}/{self.name}/catalog/tree"
+        self.current_url = url
+        resp = requests.get(url)
+        return resp
+
+    def get_category(self, category_or_children_id):
+        url = f"{self.api_url}/{self.name}/catalog/{category_or_children_id}"
+        self.current_url = url
+        resp = requests.get(url)
+        return resp
+
+    def get_parts(self, child_id):
+        url = f"{self.api_url}/{self.name}/catalog/{child_id}/parts"
+        self.current_url = url
+        resp = requests.get(url)
+        return resp
+
+    def get_part(self, part_id):
+        url = f"{self.api_url}/{self.name}/part/{part_id}"
+        self.current_url = url
+        resp = requests.get(url)
+        return resp
+
+    def __repr__(self):
+        return self.name
+
+
+class LemkenCatalog(Catalog):
+    pass
+
+
+class KubotaCatalog(Catalog):
+    pass
+
+
+class GrimmeCatalog(Catalog):
+    pass
+
+
+class ClaasCatalog(Catalog):
+    pass
+
+
+def create_catalog_instance(catalog_name):
+    cls = globals().get(f"{catalog_name.capitalize()}Catalog")
+    if cls is None:
+        raise ValueError(f"Class {catalog_name.capitalize()}Catalog is not defined.")
+    return cls(name=catalog_name)
+
+
+if __name__ == '__main__':
+    catalog = create_catalog_instance(catalog_name='grimme')
+    response = catalog.get_category(category_or_children_id=1)
+    data = response.json().get('data')
+    for el in data:
+        print(el)
+
+
+

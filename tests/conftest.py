@@ -1,5 +1,5 @@
 import pytest
-from src.catalog import create_catalog_instance
+from src.catalog.catalog import create_catalog_instance
 
 
 def pytest_addoption(parser):
