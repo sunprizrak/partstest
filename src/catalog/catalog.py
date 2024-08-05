@@ -3,7 +3,7 @@ import os
 import logging
 from datetime import datetime
 from abc import ABC, abstractmethod
-from .category import create_category_instance
+from src.catalog.category import create_category_instance
 
 
 class Catalog(ABC):
@@ -50,8 +50,8 @@ class Catalog(ABC):
         resp = requests.get(url)
         return resp
 
-    def get_category(self, category_or_children_id):
-        url = f"{self.api_url}/{self.name}/catalog/{category_or_children_id}"
+    def get_category(self, category_id):
+        url = f"{self.api_url}/{self.name}/catalog/{category_id}"
         self.current_url = url
         resp = requests.get(url)
         return resp
@@ -96,11 +96,37 @@ def create_catalog_instance(catalog_name):
 
 
 if __name__ == '__main__':
-    catalog = create_catalog_instance(catalog_name='grimme')
-    response = catalog.get_category(category_or_children_id=1)
+    catalog = create_catalog_instance(catalog_name='kubota')
+    response = catalog.get_tree()
+    data = response.json().get('data')
+    print('---------Categories------------------------------------------')
+    for key, val in data[0].items():
+        print(f"{key}: {val}")
+
+    print('---------Subcategories-----------------')
+    response = catalog.get_category(category_id=3297)
     data = response.json().get('data')
     for el in data:
         print(el)
+
+    print('-----------Two_subcategories----------------------------------')
+    response = catalog.get_category(category_id=4262)
+    data = response.json().get('data')
+    for key, val in data[1].items():
+        print(f"{key}: {val}")
+
+    print('--------------lol------------------')
+    response = catalog.get_category(category_id=4911)
+    data = response.json().get('data')
+    for el in data:
+        print(el)
+
+    print('---------Parts------------------')
+    response = catalog.get_parts(child_id=4918)
+    data = response.json().get('data')
+    for el in data:
+        print(el)
+
 
 
 
