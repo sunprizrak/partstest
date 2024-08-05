@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from .part import create_part_instance
 
 
 class Category(ABC):
@@ -6,8 +7,13 @@ class Category(ABC):
     def __init__(self, catalog,  category_id):
         self.catalog = catalog
         self.id = category_id
+        self.parts = []
         self.validation_fields = set()
         self.validation_image_fields = set()
+
+    def add_part(self, part_id):
+        part = create_part_instance(catalog=self.catalog, category=self, part_id=part_id)
+        self.parts.append(part)
 
     @abstractmethod
     def validate(self, data: dict):
@@ -18,7 +24,6 @@ class LemkenCategory(Category):
 
     def __init__(self, catalog, category_id):
         super(LemkenCategory, self).__init__(catalog, category_id)
-        self.parts_list = []
         self.validation_fields = {
             'id', 'name', 'parent_id', 'link_type', 'children',
             'created_at', 'updated_at', 'position', 'description',
@@ -27,21 +32,20 @@ class LemkenCategory(Category):
         self.validation_image_fields = {'name', 's3'}
 
     def validate(self, data: dict):
-        if data:
-            image_fields = data.get('imageFields')
+        image_fields = data.get('imageFields')
 
-            missing_fields = self.validation_fields - data.keys()
+        missing_fields = self.validation_fields - data.keys()
+
+        if len(missing_fields) > 0:
+            self.catalog.logger.warning(
+                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
+
+        if image_fields:
+            missing_fields = self.validation_image_fields - image_fields.keys()
 
             if len(missing_fields) > 0:
                 self.catalog.logger.warning(
-                    f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
-
-            if image_fields:
-                missing_fields = self.validation_image_fields - image_fields.keys()
-
-                if len(missing_fields) > 0:
-                    self.catalog.logger.warning(
-                        f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
+                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
 
 
 class KubotaCategory(Category):
@@ -54,12 +58,11 @@ class KubotaCategory(Category):
         }
 
     def validate(self, data: dict):
-        if data:
-            missing_fields = self.validation_fields - data.keys()
+        missing_fields = self.validation_fields - data.keys()
 
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
+        if len(missing_fields) > 0:
+            self.catalog.logger.warning(
+                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
 
 
 class GrimmeCategory(Category):
@@ -71,12 +74,11 @@ class GrimmeCategory(Category):
         }
 
     def validate(self, data: dict):
-        if data:
-            missing_fields = self.validation_fields - data.keys()
+        missing_fields = self.validation_fields - data.keys()
 
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
+        if len(missing_fields) > 0:
+            self.catalog.logger.warning(
+                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
 
 
 class ClaasCategory(Category):
@@ -90,12 +92,11 @@ class ClaasCategory(Category):
         }
 
     def validate(self, data: dict):
-        if data:
-            missing_fields = self.validation_fields - data.keys()
+        missing_fields = self.validation_fields - data.keys()
 
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
+        if len(missing_fields) > 0:
+            self.catalog.logger.warning(
+                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
 
 
 def create_category_instance(catalog, category_id):

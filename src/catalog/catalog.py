@@ -12,7 +12,6 @@ class Catalog(ABC):
     def __init__(self, name):
         self.name = name
         self.categories = dict()
-        self.parts = []
         self.current_url = None
         self.validation_fields = set()
         self.validation_image_fields = set()
@@ -21,9 +20,6 @@ class Catalog(ABC):
     def add_category(self, category_id):
         category = create_category_instance(catalog=self, category_id=category_id)
         self.categories[category_id] = category
-
-    def add_part(self, part_id):
-        self.parts.append(part_id)
 
     def __setup_logger(self):
         logs_dir = os.path.join('logs', self.name)
