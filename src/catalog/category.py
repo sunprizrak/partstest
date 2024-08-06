@@ -97,17 +97,27 @@ class ClaasCategory(Category):
     def __init__(self, catalog, category_id):
         super(ClaasCategory, self).__init__(catalog, category_id)
         self.validation_fields = {
-            'id', 'name', 'parent_id', 'link_type',
-            'children', 'created_at', 'updated_at',
-            'depth',
+            'id', 'name', 'parent_id', 'link_type', 'children',
+            'created_at', 'updated_at', 'position', 'description',
+            'remark', 'imageFields',
         }
+        self.validation_image_fields = {'name', 's3'}
 
     def validate(self, data: dict):
+        image_fields = data.get('imageFields')
+
         missing_fields = self.validation_fields - data.keys()
 
         if len(missing_fields) > 0:
             self.catalog.logger.warning(
                 f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
+
+        if image_fields:
+            missing_fields = self.validation_image_fields - image_fields.keys()
+
+            if len(missing_fields) > 0:
+                self.catalog.logger.warning(
+                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
 
 
 def create_category_instance(catalog, category_id):
