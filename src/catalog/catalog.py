@@ -88,6 +88,10 @@ class ClaasCatalog(Catalog):
     pass
 
 
+class RopaCatalog(Catalog):
+    pass
+
+
 def create_catalog_instance(catalog_name):
     cls = globals().get(f"{catalog_name.capitalize()}Catalog")
     if cls is None:
@@ -96,42 +100,42 @@ def create_catalog_instance(catalog_name):
 
 
 if __name__ == '__main__':
-    catalog = create_catalog_instance(catalog_name='claas')
-    response = catalog.get_tree()
-    data = response.json().get('data')
-    print('---------Categories------------------------------------------')
-    for el in data:
-        print(el)
-    print('---------category[0]-------------------------------------------')
-    for key, val in data[0].items():
-        print(f"{key}: {val}")
+    catalog = create_catalog_instance(catalog_name='lemken')
+    # response = catalog.get_tree()
+    # data = response.json().get('data')
+    # print('---------Categories------------------------------------------')
+    # for el in data:
+    #     print(el)
+    # print('---------category[0]-------------------------------------------')
+    # for key, val in data[0].items():
+    #     print(f"{key}: {val}")
 
-    print('---------Subcategories-----------------')
-    response = catalog.get_category(category_id=2)
-    data = response.json().get('data')
-    for el in data:
-        print(el)
+    # print('---------Subcategories-----------------')
+    # response = catalog.get_category(category_id=1718)
+    # data = response.json().get('data')
+    # for el in data:
+    #     print(el)
 
-    print('-----------Two_subcategories----------------------------------')
-    response = catalog.get_category(category_id=2)
-    data = response.json().get('data')
-    for key, val in data[1].items():
-        print(f"{key}: {val}")
-
-    print('--------------lol------------------')
-    response = catalog.get_category(category_id=3568)
-    data = response.json().get('data')
-    for el in data:
-        print(el)
-
-    print('-------------lol[1]---------------------------------------')
-    response = catalog.get_category(category_id=3568)
-    data = response.json().get('data')
-    for key, val in data[1].items():
-        print(f"{key}: {val}")
-
+    # print('-----------Two_subcategories----------------------------------')
+    # response = catalog.get_category(category_id=5)
+    # data = response.json().get('data')
+    # for key, val in data[1].items():
+    #     print(f"{key}: {val}")
+    #
+    # print('--------------lol------------------')
+    # response = catalog.get_category(category_id=3568)
+    # data = response.json().get('data')
+    # for el in data:
+    #     print(el)
+    #
+    # print('-------------lol[1]---------------------------------------')
+    # response = catalog.get_category(category_id=3568)
+    # data = response.json().get('data')
+    # for key, val in data[1].items():
+    #     print(f"{key}: {val}")
+    #
     print('---------Parts------------------')
-    response = catalog.get_parts(child_id=4918)
+    response = catalog.get_parts(child_id=57)
     data = response.json().get('data')
     for el in data:
         print(el)

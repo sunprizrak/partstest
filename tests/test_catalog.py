@@ -3,8 +3,15 @@ from abc import ABC, abstractmethod
 from progress.bar import IncrementalBar
 
 
+class NoDataException(Exception):
+    def __init__(self, message):
+        self.message = message
+        super().__init__(self.message)
+
+
 class BaseTestCatalog(ABC):
-    def _get_categories(self, catalog):
+
+    def _get_root_categories(self, catalog):
         response = catalog.get_tree()
 
         if response.status_code == 200:
@@ -15,7 +22,6 @@ class BaseTestCatalog(ABC):
                     bar.next()
                     time.sleep(0.2)
                     category_id = category_data.get('id')
-
                     catalog.add_category(category_id=category_id)
                     catalog.categories[category_id].validate(data=category_data)
 
@@ -37,7 +43,7 @@ class BaseTestCatalog(ABC):
 class TestLemkenCatalog(BaseTestCatalog):
 
     def test_tree(self, catalog):
-        self._get_categories(catalog=catalog)
+        self._get_root_categories(catalog=catalog)
 
         if catalog.categories:
             subcategories = dict()
@@ -163,7 +169,7 @@ class TestLemkenCatalog(BaseTestCatalog):
 class TestGrimmeCatalog(BaseTestCatalog):
 
     def test_tree(self, catalog):
-        self._get_categories(catalog=catalog)
+        self._get_root_categories(catalog=catalog)
 
     def test_parts(self, catalog):
         pass
@@ -172,7 +178,7 @@ class TestGrimmeCatalog(BaseTestCatalog):
 class TestKubotaCatalog(BaseTestCatalog):
 
     def test_tree(self, catalog):
-        self._get_categories(catalog=catalog)
+        self._get_root_categories(catalog=catalog)
 
         if catalog.categories:
             subcategories = dict()
@@ -320,7 +326,7 @@ class TestKubotaCatalog(BaseTestCatalog):
 
 class TestClaasCatalog(BaseTestCatalog):
     def test_tree(self, catalog):
-        self._get_categories(catalog=catalog)
+        self._get_root_categories(catalog=catalog)
 
         if catalog.categories:
             subcategories = dict()
@@ -464,6 +470,15 @@ class TestClaasCatalog(BaseTestCatalog):
             bar.finish()
         else:
             catalog.logger.warning(f'No parts in catalog: {catalog.name}')
+
+
+class TestRopaCatalog(BaseTestCatalog):
+
+    def test_tree(self, catalog):
+        pass
+
+    def test_parts(self, catalog):
+        pass
 
 
 class TestCatalog:
