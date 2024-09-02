@@ -169,10 +169,152 @@ class TestLemkenCatalog(BaseTestCatalog):
 class TestGrimmeCatalog(BaseTestCatalog):
 
     def test_tree(self, catalog):
-        self._get_root_categories(catalog=catalog)
+        response = catalog.get_tree()
+
+        if response.status_code == 200:
+            data = response.json().get('data')
+
+            if data:
+                bar = IncrementalBar(f'{catalog.name} categories', max=len(data), suffix='%(index)d/%(max)d ')
+                for category_data in data:
+                    bar.next()
+                    time.sleep(0.1)
+                    category_id = category_data.get('id')
+                    catalog.add_category(category_id=category_id)
+                    catalog.categories[category_id].validate(data=category_data)
+
+                    models = category_data.get('children')
+
+                    if not models:
+                        catalog.logger.warning(
+                            f'No children(models) in data catalog: {catalog.name} category_id: {category_id}')
+                        continue
+
+                    for model in models:
+                        model_id = model.get('id')
+
+                        modifications = model.get('children')
+
+                        if not modifications:
+                            catalog.logger.warning(
+                                f'No children in data catalog: {catalog.name} category_id: {category_id} model_id: {model_id}')
+                            continue
+
+                        for modification in modifications:
+                            modification_id = modification.get('id')
+                            catalog.categories[category_id].modifications.append(f"{category_id}_-_{modification_id}")
+                bar.finish()
+
+                modifications = []
+
+                for el in catalog.categories.values():
+                    modifications.extend(el.modifications)
+
+                node_groups = []
+
+                bar = IncrementalBar(f'receive node_groups from modifications', max=len(modifications), suffix='%(index)d/%(max)d ')
+                for modification in modifications:
+                    bar.next()
+                    category_id, modification_id = modification.split('_-_')
+                    response = catalog.get_category(category_id=int(modification_id))
+
+                    if response.status_code != 200:
+                        catalog.logger.warning(
+                            f'Bad request catalog: {catalog.name} category_id: {modification_id} {catalog.current_url}')
+                        continue
+
+                    data = response.json().get('data')
+
+                    if not data:
+                        catalog.logger.warning(
+                            f'No data in catalog: {catalog.name} category_id: {modification_id}')
+                        continue
+
+                    for node_group in data:
+                        node_group_id = node_group.get('id')
+                        node_groups.append(f"{category_id}_-_{node_group_id}")
+                bar.finish()
+
+                nodes = []
+
+                bar = IncrementalBar(f'receive node from node_groups', max=len(node_groups), suffix='%(index)d/%(max)d ')
+                for node_group in node_groups:
+                    bar.next()
+                    category_id, node_group_id = node_group.split('_-_')
+                    response = catalog.get_category(category_id=int(node_group_id))
+
+                    if response.status_code != 200:
+                        catalog.logger.warning(
+                            f'Bad request catalog: {catalog.name} category_id: {node_group_id} {catalog.current_url}')
+                        continue
+
+                    data = response.json().get('data')
+
+                    if not data:
+                        catalog.logger.warning(
+                            f'No data in catalog: {catalog.name} category_id: {node_group_id}')
+                        continue
+
+                    for node in data:
+                        node_id = node.get('id')
+                        nodes.append(f"{category_id}_-_{node_id}")
+                bar.finish()
+
+                bar = IncrementalBar(f'receive parts from nodes', max=len(nodes), suffix='%(index)d/%(max)d ')
+                for node in nodes:
+                    bar.next()
+                    category_id, node_id = node.split('_-_')
+                    response = catalog.get_category(category_id=int(node_id))
+
+                    if response.status_code != 200:
+                        catalog.logger.warning(
+                            f'Bad request catalog: {catalog.name} category_id: {node_id} {catalog.current_url}')
+                        continue
+
+                    data = response.json().get('data')
+
+                    if not data:
+                        catalog.logger.warning(
+                            f'No data in catalog: {catalog.name} category_id: {node_id}')
+                        continue
+
+                    for part in data:
+                        part_id = part.get('id')
+                        category = catalog.categories[int(category_id)]
+                        category.add_part(part_id=part_id)
+                bar.finish()
+            else:
+                catalog.logger.warning(f'No data in {catalog.name} {catalog.current_url}')
+        else:
+            catalog.logger.warning(f'Bad request {catalog.name} {catalog.current_url}')
 
     def test_parts(self, catalog):
-        pass
+        parts = []
+
+        for el in catalog.categories.values():
+            parts.extend(el.parts)
+
+        if parts:
+            bar = IncrementalBar(f'check fields in detail', max=len(parts), suffix='%(index)d/%(max)d ')
+            for part in parts:
+                bar.next()
+                response = catalog.get_part(part_id=part.id)
+
+                if response.status_code != 200:
+                    catalog.logger.warning(
+                        f'Bad request catalog: {catalog.name} part_id: {part.id} {catalog.current_url}')
+                    continue
+
+                data = response.json().get('data')
+
+                if not data:
+                    catalog.logger.warning(f'No data in {catalog.name} Part_id: {part.id})')
+                    continue
+
+                part.validate(data=data)
+            bar.finish()
+        else:
+            catalog.logger.warning(f'No parts in catalog: {catalog.name}')
 
 
 class TestKubotaCatalog(BaseTestCatalog):

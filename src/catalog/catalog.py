@@ -100,15 +100,16 @@ def create_catalog_instance(catalog_name):
 
 
 if __name__ == '__main__':
-    catalog = create_catalog_instance(catalog_name='lemken')
-    # response = catalog.get_tree()
-    # data = response.json().get('data')
-    # print('---------Categories------------------------------------------')
-    # for el in data:
-    #     print(el)
-    # print('---------category[0]-------------------------------------------')
-    # for key, val in data[0].items():
-    #     print(f"{key}: {val}")
+    catalog = create_catalog_instance(catalog_name='grimme')
+    response = catalog.get_tree()
+    data = response.json().get('data')
+    print('---------Categories------------------------------------------')
+    print(f"колличество категорий: {len(data)}")
+    for el in data:
+        print(el)
+    print('---------category[0]-------------------------------------------')
+    for key, val in data[0].items():
+        print(f"{key}: {val}")
 
     # print('---------Subcategories-----------------')
     # response = catalog.get_category(category_id=1718)
@@ -134,11 +135,11 @@ if __name__ == '__main__':
     # for key, val in data[1].items():
     #     print(f"{key}: {val}")
     #
-    print('---------Parts------------------')
-    response = catalog.get_parts(child_id=57)
-    data = response.json().get('data')
-    for el in data:
-        print(el)
+    # print('---------Parts------------------')
+    # response = catalog.get_parts(child_id=57)
+    # data = response.json().get('data')
+    # for el in data:
+    #     print(el)
 
 
 

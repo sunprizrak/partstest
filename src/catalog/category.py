@@ -79,6 +79,7 @@ class KubotaCategory(Category):
 class GrimmeCategory(Category):
     def __init__(self, catalog, category_id):
         super(GrimmeCategory, self).__init__(catalog, category_id)
+        self.modifications = []
         self.validation_fields = {
             'id', 'label', 'parent_id', 'linkType',
             'children', 'created_at', 'updated_at',
