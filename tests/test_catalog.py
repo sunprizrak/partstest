@@ -20,11 +20,8 @@ class BaseTestCatalog(ABC):
                 bar = IncrementalBar(f'{catalog.name} categories', max=len(data), suffix='%(index)d/%(max)d ')
                 for category_data in data:
                     bar.next()
-                    time.sleep(0.2)
-                    category_id = category_data.get('id')
-                    catalog.add_category(category_id=category_id)
-                    catalog.categories[category_id].validate(data=category_data)
-
+                    time.sleep(0.1)
+                    catalog.add_category(data=category_data)
                 bar.finish()
             else:
                 catalog.logger.warning(f'No data in {catalog.name} {catalog.current_url}')
@@ -35,9 +32,33 @@ class BaseTestCatalog(ABC):
     def test_tree(self, catalog):
         pass
 
-    @abstractmethod
     def test_parts(self, catalog):
-        pass
+        parts = []
+
+        for el in catalog.categories.values():
+            parts.extend(el.parts)
+
+        if parts:
+            bar = IncrementalBar(f'check fields in detail', max=len(parts), suffix='%(index)d/%(max)d ')
+            for part in parts:
+                bar.next()
+                response = catalog.get_part(part_id=part.id)
+
+                if response.status_code != 200:
+                    catalog.logger.warning(
+                        f'Bad request catalog: {catalog.name} part_id: {part.id} {catalog.current_url}')
+                    continue
+
+                data = response.json().get('data')
+
+                if not data:
+                    catalog.logger.warning(f'No data in {catalog.name} Part_id: {part.id})')
+                    continue
+
+                part.validate(data=data)
+            bar.finish()
+        else:
+            catalog.logger.warning(f'No parts in catalog: {catalog.name}')
 
 
 class TestLemkenCatalog(BaseTestCatalog):
@@ -136,34 +157,6 @@ class TestLemkenCatalog(BaseTestCatalog):
             bar.finish()
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
-
-    def test_parts(self, catalog):
-        parts = []
-
-        for el in catalog.categories.values():
-            parts.extend(el.parts)
-
-        if parts:
-            bar = IncrementalBar(f'check fields in detail', max=len(parts), suffix='%(index)d/%(max)d ')
-            for part in parts:
-                bar.next()
-                response = catalog.get_part(part_id=part.id)
-
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request catalog: {catalog.name} part_id: {part.id} {catalog.current_url}')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    catalog.logger.warning(f'No data in {catalog.name} Part_id: {part.id})')
-                    continue
-
-                part.validate(data=data)
-            bar.finish()
-        else:
-            catalog.logger.warning(f'No parts in catalog: {catalog.name}')
 
 
 class TestGrimmeCatalog(BaseTestCatalog):
@@ -287,34 +280,6 @@ class TestGrimmeCatalog(BaseTestCatalog):
                 catalog.logger.warning(f'No data in {catalog.name} {catalog.current_url}')
         else:
             catalog.logger.warning(f'Bad request {catalog.name} {catalog.current_url}')
-
-    def test_parts(self, catalog):
-        parts = []
-
-        for el in catalog.categories.values():
-            parts.extend(el.parts)
-
-        if parts:
-            bar = IncrementalBar(f'check fields in detail', max=len(parts), suffix='%(index)d/%(max)d ')
-            for part in parts:
-                bar.next()
-                response = catalog.get_part(part_id=part.id)
-
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request catalog: {catalog.name} part_id: {part.id} {catalog.current_url}')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    catalog.logger.warning(f'No data in {catalog.name} Part_id: {part.id})')
-                    continue
-
-                part.validate(data=data)
-            bar.finish()
-        else:
-            catalog.logger.warning(f'No parts in catalog: {catalog.name}')
 
 
 class TestKubotaCatalog(BaseTestCatalog):
@@ -586,40 +551,234 @@ class TestClaasCatalog(BaseTestCatalog):
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
-    def test_parts(self, catalog):
-        parts = []
 
-        for el in catalog.categories.values():
-            parts.extend(el.parts)
+class TestKroneCatalog(BaseTestCatalog):
 
-        if parts:
-            bar = IncrementalBar(f'check fields in detail', max=len(parts), suffix='%(index)d/%(max)d ')
-            for part in parts:
+    def test_tree(self, catalog):
+        self._get_root_categories(catalog=catalog)
+
+        if catalog.categories:
+            part_groups = dict()
+            part_lists = dict()
+
+            bar = IncrementalBar(f'receive PART_GROUPS from {catalog.name} categories', max=len(list(catalog.categories)),
+                                 suffix='%(index)d/%(max)d ')
+            for category_id in list(catalog.categories):
                 bar.next()
-                response = catalog.get_part(part_id=part.id)
+                response = catalog.get_category(category_id=category_id)
 
                 if response.status_code != 200:
-                    catalog.logger.warning(f'Bad request catalog: {catalog.name} part_id: {part.id} {catalog.current_url}')
+                    catalog.logger.warning(
+                        f'Bad request catalog: {catalog.name} category_id: {category_id} {catalog.current_url}')
                     continue
 
                 data = response.json().get('data')
 
                 if not data:
-                    catalog.logger.warning(f'No data in {catalog.name} Part_id: {part.id})')
+                    catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category_id}')
                     continue
 
-                part.validate(data=data)
+                children = data[0].get('children')
+
+                if not children:
+                    catalog.logger.warning(
+                        f'No children in data catalog: {catalog.name} category_id: {category_id}')
+                    continue
+
+                for part_group in children:
+                    part_group_id = part_group.get('id')
+                    response2 = catalog.get_category(category_id=part_group_id)
+
+                    if response.status_code != 200:
+                        catalog.logger.warning(
+                            f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_group: {part_group_id}')
+                        continue
+
+                    data2 = response2.json().get('data')
+
+                    if not data2:
+                        catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category_id} part_group: {part_group_id}')
+                        continue
+
+                    children2 = data2[0].get('children')
+
+                    if not children2:
+                        catalog.logger.warning(
+                            f'No children in data catalog: {catalog.name} category_id: {category_id} part_group_id: {part_group_id}')
+                        continue
+
+                    for index, part_group2 in enumerate(children2):
+                        part_group2_id = part_group2.get('id')
+                        part_groups[f"{index}_-_{category_id}"] = part_group2_id
+            bar.finish()
+
+            bar = IncrementalBar(f'receive PART_LISTS from PART_GROUPS', max=len(part_groups), suffix='%(index)d/%(max)d ')
+            for category_data, part_group_id in part_groups.items():
+                bar.next()
+                category_id = category_data.split('_-_')[-1]
+                response = catalog.get_category(category_id=part_group_id)
+
+                if response.status_code != 200:
+                    catalog.logger.warning(
+                        f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_group_id: {part_group_id}')
+                    continue
+
+                data = response.json().get('data')
+
+                if not data:
+                    catalog.logger.warning(
+                        f'No data in catalog: {catalog.name} category_id: {category_id} part_group_id: {part_group_id}')
+                    continue
+
+                for index, part_list in enumerate(data):
+                    part_list_id = part_list.get('id')
+                    part_lists[f"{index}_-_{part_group_id}_-_{category_id}"] = part_list_id
+            bar.finish()
+
+            bar = IncrementalBar(f'receive parts from part_lists', max=len(part_lists), suffix='%(index)d/%(max)d ')
+            for category_data, part_list_id in part_lists.items():
+                bar.next()
+                _, part_group_id, category_id = category_data.split('_-_')
+                response = catalog.get_parts(child_id=part_list_id)
+
+                if response.status_code != 200:
+                    catalog.logger.warning(
+                        f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_group_id: {part_group_id} part_list_id: {part_list_id}')
+                    continue
+
+                data = response.json().get('data')
+
+                if not data:
+                    catalog.logger.warning(
+                        f'No Parts in {catalog.name} category_id: {category_id} part_group_id: {part_group_id} part_list_id: {part_list_id}')
+                    continue
+
+                for part in data:
+                    part_id = part.get('id')
+                    category = catalog.categories[int(category_id)]
+                    category.add_part(part_id=part_id)
             bar.finish()
         else:
-            catalog.logger.warning(f'No parts in catalog: {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog.name}')
+
+
+class TestKvernelandCatalog(BaseTestCatalog):
+
+    def test_tree(self, catalog):
+        self._get_root_categories(catalog=catalog)
+
+        if catalog.categories:
+            subcategories = dict()
+            part_lists = dict()
+
+            bar = IncrementalBar(f'receive subcategories from {catalog.name} categories',
+                                 max=len(list(catalog.categories)[:1]),
+                                 suffix='%(index)d/%(max)d ')
+            for category_id in list(catalog.categories)[:1]:
+                bar.next()
+                response = catalog.get_category(category_id=category_id)
+
+                if response.status_code != 200:
+                    catalog.logger.warning(
+                        f'Bad request catalog: {catalog.name} category_id: {category_id} {catalog.current_url}')
+                    continue
+
+                data = response.json().get('data')
+
+                if not data:
+                    catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category_id}')
+                    continue
+
+                children = data[0].get('children')
+
+                if not children:
+                    catalog.logger.warning(
+                        f'No children in data catalog: {catalog.name} category_id: {category_id}')
+                    continue
+
+                for child in children:
+                    child_id = child.get('id')
+                    response2 = catalog.get_category(category_id=child_id)
+
+                    if response.status_code != 200:
+                        catalog.logger.warning(
+                            f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_list: {child_id}')
+                        continue
+
+                    data2 = response2.json().get('data')
+
+                    if not data2:
+                        catalog.logger.warning(
+                            f'Note data in catalog: {catalog.name} category_id: {category_id} part_list: {child_id}')
+                        continue
+
+                    children2 = data2[0].get('children')
+
+                    if not children2:
+                        catalog.logger.warning(
+                            f'No children in data catalog: {catalog.name} category_id: {category_id} part_group_id: {child_id}')
+                        continue
+
+                    for index, child2 in enumerate(children2):
+                        child2_id = child2.get('id')
+                        subcategories[f"{index}_-_{category_id}"] = child2_id
+            bar.finish()
+
+            bar = IncrementalBar(f'receive PART_LISTS from subcategories', max=len(subcategories), suffix='%(index)d/%(max)d ')
+            for category_data, subcategory_id in subcategories.items():
+                bar.next()
+                category_id = category_data.split('_-_')[-1]
+                response = catalog.get_category(category_id=subcategory_id)
+
+                if response.status_code != 200:
+                    catalog.logger.warning(
+                        f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} subcategory_id: {subcategory_id}')
+                    continue
+
+                data = response.json().get('data')
+
+                if not data:
+                    catalog.logger.warning(
+                        f'No data in catalog: {catalog.name} category_id: {category_id} subcategory_id: {subcategory_id}')
+                    continue
+
+                for index, part_list in enumerate(data):
+                    part_list_id = part_list.get('id')
+                    part_lists[f"{index}_-_{subcategory_id}_-_{category_id}"] = part_list_id
+            bar.finish()
+
+            bar = IncrementalBar(f'receive parts from part_lists', max=len(part_lists), suffix='%(index)d/%(max)d ')
+            for category_data, part_list_id in part_lists.items():
+                bar.next()
+                _, subcategory_id, category_id = category_data.split('_-_')
+                response = catalog.get_parts(child_id=part_list_id)
+
+                if response.status_code != 200:
+                    catalog.logger.warning(
+                        f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_group_id: {subcategory_id} part_list_id: {part_list_id}')
+                    continue
+
+                data = response.json().get('data')
+
+                if not data:
+                    catalog.logger.warning(
+                        f'No Parts in {catalog.name} category_id: {category_id} part_group_id: {subcategory_id} part_list_id: {part_list_id}')
+                    continue
+
+                for part in data:
+                    part_id = part.get('id')
+                    category = catalog.categories[int(category_id)]
+                    category.add_part(part_id=part_id)
+            bar.finish()
+        else:
+            catalog.logger.warning(f'No Categories in {catalog.name}')
+
+
 
 
 class TestRopaCatalog(BaseTestCatalog):
 
     def test_tree(self, catalog):
-        pass
-
-    def test_parts(self, catalog):
         pass
 
 

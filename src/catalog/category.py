@@ -4,9 +4,10 @@ from src.catalog.part import create_part_instance
 
 class Category(ABC):
 
-    def __init__(self, catalog,  category_id):
-        self.catalog = catalog
-        self.id = category_id
+    def __init__(self, *args, **kwargs):
+        self.catalog = kwargs.get('catalog')
+        self.id = kwargs.get('category_id')
+        self.name = kwargs.get('name')
         self.parts = []
         self.validation_fields = set()
         self.validation_image_fields = set()
@@ -19,11 +20,17 @@ class Category(ABC):
     def validate(self, data: dict):
         pass
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return self.name
+
 
 class LemkenCategory(Category):
 
-    def __init__(self, catalog, category_id):
-        super(LemkenCategory, self).__init__(catalog, category_id)
+    def __init__(self, *args, **kwargs):
+        super(LemkenCategory, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'parent_id', 'link_type', 'children',
             'created_at', 'updated_at', 'position', 'description',
@@ -50,8 +57,8 @@ class LemkenCategory(Category):
 
 class KubotaCategory(Category):
 
-    def __init__(self, catalog, category_id):
-        super(KubotaCategory, self).__init__(catalog, category_id)
+    def __init__(self, *args, **kwargs):
+        super(KubotaCategory, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'parent_id', 'link_type', 'children',
             'created_at', 'updated_at', 'position', 'description',
@@ -77,8 +84,8 @@ class KubotaCategory(Category):
 
 
 class GrimmeCategory(Category):
-    def __init__(self, catalog, category_id):
-        super(GrimmeCategory, self).__init__(catalog, category_id)
+    def __init__(self, *args, **kwargs):
+        super(GrimmeCategory, self).__init__(*args, **kwargs)
         self.modifications = []
         self.validation_fields = {
             'id', 'label', 'parent_id', 'linkType',
@@ -93,10 +100,48 @@ class GrimmeCategory(Category):
                 f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
 
 
+class KroneCategory(Category):
+
+    def __init__(self, *args, **kwargs):
+        super(KroneCategory, self).__init__(*args, **kwargs)
+        self.validation_fields = {
+            'id', 'label', 'parent_id', 'linkType',
+            'children', 'created_at', 'updated_at',
+        }
+
+    def validate(self, data: dict):
+        pass
+
+
+class KvernelandCategory(Category):
+    def __init__(self, *args, **kwargs):
+        super(KvernelandCategory, self).__init__(*args, **kwargs)
+        self.validation_fields = {
+            'id', 'label', 'parent_id', 'linkType',
+            'children', 'created_at', 'updated_at',
+        }
+
+    def validate(self, data: dict):
+        pass
+
+
+class JdeereCategory(Category):
+
+    def __init__(self, *args, **kwargs):
+        super(JdeereCategory, self).__init__(*args, **kwargs)
+        self.validation_fields = {
+            'id', 'label', 'parent_id', 'linkType',
+            'children', 'created_at', 'updated_at',
+        }
+
+    def validate(self, data: dict):
+        pass
+
+
 class ClaasCategory(Category):
 
-    def __init__(self, catalog, category_id):
-        super(ClaasCategory, self).__init__(catalog, category_id)
+    def __init__(self, *args, **kwargs):
+        super(ClaasCategory, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'parent_id', 'link_type', 'children',
             'created_at', 'updated_at', 'position', 'description',
@@ -122,8 +167,8 @@ class ClaasCategory(Category):
 
 
 class RopaCategory(Category):
-    def __init__(self, catalog, category_id):
-        super(RopaCategory, self).__init__(catalog, category_id)
+    def __init__(self, *args, **kwargs):
+        super(RopaCategory, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'parent_id', 'link_type', 'children',
             'created_at', 'updated_at', 'position', 'description',
@@ -148,11 +193,11 @@ class RopaCategory(Category):
                     f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
 
 
-def create_category_instance(catalog, category_id):
+def create_category_instance(catalog, category_id, name):
     cls = globals().get(f"{catalog.name.capitalize()}Category")
     if cls is None:
         raise ValueError(f"Class {catalog.name.capitalize()}Category is not defined.")
-    return cls(catalog, category_id)
+    return cls(catalog=catalog, category_id=category_id, name=name)
 
 
 if __name__ == '__main__':

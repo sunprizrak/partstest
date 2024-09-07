@@ -3,11 +3,12 @@ import os
 import logging
 from datetime import datetime
 from abc import ABC, abstractmethod
-from src.catalog.category import create_category_instance
+from src.catalog.category import create_category_instance, LemkenCategory
 
 
 class Catalog(ABC):
     api_url = 'http://api.catalog.detalum.ru/api/v1'
+    name_label_category = 'name'
 
     def __init__(self, name):
         self.name = name
@@ -17,9 +18,12 @@ class Catalog(ABC):
         self.validation_image_fields = set()
         self.logger = self.__setup_logger()
 
-    def add_category(self, category_id):
-        category = create_category_instance(catalog=self, category_id=category_id)
+    def add_category(self, data):
+        category_id = data.get('id')
+        name = data.get(self.name_label_category)
+        category = create_category_instance(catalog=self, category_id=category_id, name=name)
         self.categories[category_id] = category
+        self.categories[category_id].validate(data=data)
 
     def __setup_logger(self):
         logs_dir = os.path.join('logs', self.name)
@@ -81,10 +85,25 @@ class KubotaCatalog(Catalog):
 
 
 class GrimmeCatalog(Catalog):
-    pass
+
+    def __init__(self, name):
+        super(GrimmeCatalog, self).__init__(name)
+        self.name_label_category = 'label'
 
 
 class ClaasCatalog(Catalog):
+    pass
+
+
+class KroneCatalog(Catalog):
+    pass
+
+
+class KvernelandCatalog(Catalog):
+    pass
+
+
+class JdeereCatalog(Catalog):
     pass
 
 
@@ -100,19 +119,18 @@ def create_catalog_instance(catalog_name):
 
 
 if __name__ == '__main__':
-    catalog = create_catalog_instance(catalog_name='grimme')
+    catalog = create_catalog_instance(catalog_name='ropa')
     response = catalog.get_tree()
     data = response.json().get('data')
     print('---------Categories------------------------------------------')
     print(f"колличество категорий: {len(data)}")
-    for el in data:
-        print(el)
+    print(f'type data : {type(data)}')
     print('---------category[0]-------------------------------------------')
     for key, val in data[0].items():
         print(f"{key}: {val}")
 
     # print('---------Subcategories-----------------')
-    # response = catalog.get_category(category_id=1718)
+    # response = catalog.get_category(category_id=4)
     # data = response.json().get('data')
     # for el in data:
     #     print(el)
@@ -136,7 +154,7 @@ if __name__ == '__main__':
     #     print(f"{key}: {val}")
     #
     # print('---------Parts------------------')
-    # response = catalog.get_parts(child_id=57)
+    # response = catalog.get_parts(child_id=4998)
     # data = response.json().get('data')
     # for el in data:
     #     print(el)
