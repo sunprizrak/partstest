@@ -1,3 +1,5 @@
 pytest
 requests
 progress
+colorama
+InquirerPy

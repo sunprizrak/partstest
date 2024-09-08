@@ -11,7 +11,7 @@ class NoDataException(Exception):
 
 class BaseTestCatalog(ABC):
 
-    def _get_root_categories(self, catalog):
+    def test_root_categories(self, catalog):
         response = catalog.get_tree()
 
         if response.status_code == 200:
@@ -774,8 +774,6 @@ class TestKvernelandCatalog(BaseTestCatalog):
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
 
-
-
 class TestRopaCatalog(BaseTestCatalog):
 
     def test_tree(self, catalog):
@@ -793,6 +791,10 @@ class TestCatalog:
             raise ValueError(f"Test class {test_class_name} is not defined.")
 
         return test_class()
+
+    def test_root_categories(self, catalog):
+        instance = self._get_test_instance(catalog)
+        instance.test_root_categories(catalog)
 
     def test_tree(self, catalog):
         instance = self._get_test_instance(catalog)

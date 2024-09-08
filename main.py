@@ -1,7 +1,13 @@
+import threading
 import time
+import pytest
+import requests
 from InquirerPy import inquirer
-from progress.bar import IncrementalBar
-from src.catalog.catalog import create_catalog_instance
+from progress.spinner import Spinner
+from colorama import Fore, init
+
+# Инициализация colorama
+init(autoreset=True)
 
 '''
 name = inquirer.text(message="What's your name:").execute()
@@ -13,57 +19,140 @@ confirm = inquirer.confirm(message="Confirm?").execute()
 '''
 
 
-main_menu = []
-sub_menu = []
+def update_spinner(spin, spin_event):
+    while not spin_event.is_set():
+        spin.next()
+        time.sleep(0.1)
+
+
+class Level:
+
+    def __init__(self):
+        self.count = 0
+        self.menu = {}
+
+    def __add__(self, other):
+        self.count += other
+
+    def __sub__(self, other):
+        if self.count > 0:
+            self.count -= other
+
+    def __gt__(self, other):
+        return self.count > other
+
+    def add_menu(self, value):
+        self.menu[self.count] = value
+
+    def get_menu(self):
+        return self.menu[self.count]
+
+    def clean(self):
+        self.count = 0
+        self.menu.clear()
+
+
+level = Level()
+
+
 
 
 def start_app():
+    print(Fore.GREEN + 'App for testing API https://detalum.ru/')
     choice = inquirer.select(
-        message="This app for testing https://detalum.ru/\n select start to continue or stop to exit:",
-        choices=['start', 'exit'],
+        message="Choice continue or exit:",
+        qmark='',
+        amark='',
+        choices=['continue', 'exit'],
     ).execute()
 
-    if choice == 'start':
-        name = inquirer.text(message="Введите название каталога:").execute()
-        catalog = create_catalog_instance(catalog_name=name.lower())
-        response = catalog.get_tree()
+    if choice == 'continue':
+        spinner = Spinner(Fore.CYAN + 'Loading Brands ')
+        stop_spinner = threading.Event()
+
+        thread = threading.Thread(target=update_spinner, args=(spinner, stop_spinner))
+        thread.start()
+
+        url = 'http://api.catalog.detalum.ru/api/v1/brand'
+        response = requests.get(url)
+
+        brands = dict()
 
         if response.status_code == 200:
             data = response.json().get('data')
             if data:
-                bar = IncrementalBar(f'{catalog.name} get categories', max=len(data), suffix='%(index)d/%(max)d ')
-                for category_data in data:
-                    bar.next()
-                    time.sleep(0.1)
-                    catalog.add_category(data=category_data)
-                bar.finish()
+                brands = {brand.get('label'): brand.get('slug') for brand in data}
+                print(brands)
             else:
-                catalog.logger.warning(f'No data in {catalog.name} {catalog.current_url}')
+                print(Fore.RED + f'No data in responuse {url}')
         else:
-            catalog.logger.warning(f'Bad request {catalog.name} {catalog.current_url}')
+            print(Fore.RED + f'Bad request {url}')
 
-        if catalog.categories:
-            main_menu = [category.name for category in catalog.categories.values()]
-            open_menu(menu=main_menu)
+        stop_spinner.set()
+        thread.join()
 
-    elif choice == 'stop':
+        if brands:
+            level + 1
+            level.add_menu(brands)
+            open_menu()
+        else:
+            print(Fore.YELLOW + '\n No Brands.')
+            start_app()
+
+    elif choice == 'exit':
         exit()
 
 
-def open_menu(menu):
-    menu_list = menu + ['назад']
+def open_menu(**kwargs):
+    menu = level.get_menu()
+
+    if isinstance(menu, tuple):
+        menu = menu[0]
+
+    menu_list = [elem for elem in menu] + ['<<< назад >>>']
+    message = "\nSelect Brand:"
+    brand_slug = None
+
+    if kwargs.get('brand'):
+        brand = kwargs.get('brand')
+        message = f"Brand {brand}:"
+
     choice = inquirer.select(
-        message="select category:",
+        message=message,
         choices=menu_list,
+        qmark='',
+        amark='',
         height=len(menu_list),
     ).execute()
 
-    if choice == 'назад':
-        start_app()
+    if choice.lower()[:4] == 'тест':
+        command = menu.get(choice).split()
+        pytest.main(command)
+        open_menu()
+    elif choice == '<<< назад >>>':
+        level - 1
+        if level > 0:
+            open_menu()
+        else:
+            level.clean()
+            start_app()
     else:
-        print(choice)
+        brand_slug = menu.get(choice)
+        catalog_menu = {
+                'Тест каталога': 1,
+                'Тест дерева': 2,
+                'Тест корневых категорий': f'-s -v tests/test_catalog.py::TestCatalog::test_root_categories --catalogs={brand_slug}',
+                'Тест API': 4,
+        },
+        level + 1
+        level.add_menu(catalog_menu)
+        open_menu(brand=choice)
+
+
 
 
 
 if __name__ == '__main__':
     start_app()
+
+
