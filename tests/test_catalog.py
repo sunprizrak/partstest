@@ -32,12 +32,18 @@ class BaseTestCatalog(ABC):
     def test_parts(self, catalog):
 
         for category in catalog.categories.values():
-            category.get_parts()
+            if category.part_lists:
+                category.get_parts()
+            else:
+                catalog.logger.warning(f'No PARTLISTS in {catalog.name} category_name: {category.name} category_id: {category.id})')
 
         parts = []
 
         for category in catalog.categories.values():
-            parts.extend(category.parts)
+            if category.parts:
+                parts.extend(category.parts)
+            else:
+                catalog.logger.warning(f'No PARTS in {catalog.name} category_name: {category.name} category_id: {category.id})')
 
         if parts:
             bar = IncrementalBar(f'validate details in {catalog.name}', max=len(parts), suffix='%(index)d/%(max)d ')
