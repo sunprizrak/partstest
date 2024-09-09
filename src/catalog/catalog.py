@@ -21,9 +21,19 @@ class Catalog(ABC):
     def add_category(self, data):
         category_id = data.get('id')
         name = data.get(self.name_label_category)
-        category = create_category_instance(catalog=self, category_id=category_id, name=name)
+        category = create_category_instance(catalog=self, category_id=category_id, name=name, data=data)
         self.categories[category_id] = category
-        self.categories[category_id].validate(data=data)
+        return category
+
+    def get_data_root_categories(self):
+        response = self.get_tree()
+
+        if response.status_code == 200:
+            data = response.json().get('data')
+            return data
+        else:
+            self.logger.warning(f'Bad request {self.current_url} catalog: {self.name}')
+            return False
 
     def __setup_logger(self):
         logs_dir = os.path.join('logs', self.name)
@@ -119,7 +129,7 @@ def create_catalog_instance(catalog_name):
 
 
 if __name__ == '__main__':
-    catalog = create_catalog_instance(catalog_name='ropa')
+    catalog = create_catalog_instance(catalog_name='lemken')
     response = catalog.get_tree()
     data = response.json().get('data')
     print('---------Categories------------------------------------------')
@@ -129,11 +139,11 @@ if __name__ == '__main__':
     for key, val in data[0].items():
         print(f"{key}: {val}")
 
-    # print('---------Subcategories-----------------')
-    # response = catalog.get_category(category_id=4)
-    # data = response.json().get('data')
-    # for el in data:
-    #     print(el)
+    print('---------Subcategories-----------------')
+    response = catalog.get_category(category_id=4)
+    data = response.json().get('data')
+    for el in data:
+        print(el)
 
     # print('-----------Two_subcategories----------------------------------')
     # response = catalog.get_category(category_id=5)

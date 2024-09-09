@@ -12,21 +12,18 @@ class NoDataException(Exception):
 class BaseTestCatalog(ABC):
 
     def test_root_categories(self, catalog):
-        response = catalog.get_tree()
+        data = catalog.get_data_root_categories()
 
-        if response.status_code == 200:
-            data = response.json().get('data')
-            if data:
-                bar = IncrementalBar(f'{catalog.name} categories', max=len(data), suffix='%(index)d/%(max)d ')
-                for category_data in data:
-                    bar.next()
-                    time.sleep(0.1)
-                    catalog.add_category(data=category_data)
-                bar.finish()
-            else:
-                catalog.logger.warning(f'No data in {catalog.name} {catalog.current_url}')
+        if data:
+            bar = IncrementalBar(f'{catalog.name} categories', max=len(data), suffix='%(index)d/%(max)d ')
+            for category_data in data:
+                bar.next()
+                time.sleep(0.1)
+                category = catalog.add_category(data=category_data)
+                category.validate(data=category_data)
+            bar.finish()
         else:
-            catalog.logger.warning(f'Bad request {catalog.name} {catalog.current_url}')
+            catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog.name}')
 
     @abstractmethod
     def test_tree(self, catalog):
@@ -64,72 +61,30 @@ class BaseTestCatalog(ABC):
 class TestLemkenCatalog(BaseTestCatalog):
 
     def test_tree(self, catalog):
-        self._get_root_categories(catalog=catalog)
+        self.test_root_categories(catalog=catalog)
 
         if catalog.categories:
-            subcategories = dict()
-            parts_list = dict()
+            children = []
 
-            bar = IncrementalBar(f'receive categories data from {catalog.name} ',
-                                 max=len(list(catalog.categories)), suffix='%(index)d/%(max)d ')
-            for category_id in list(catalog.categories):
+            bar = IncrementalBar(
+                f'receive children from root categories {catalog.name} ',
+                max=len(list(catalog.categories)), suffix='%(index)d/%(max)d ',
+            )
+            for category in list(catalog.categories.values()):
                 bar.next()
                 time.sleep(0.1)
-                response = catalog.get_category(category_id=category_id)
+                children_list = category.get_children()
+                children.extend(children_list)
 
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request catalog: {catalog.name} category_id: {category_id} {catalog.current_url}')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category_id}')
-                    continue
-
-                for subcategory in data:
-                    children = subcategory.get('children')
-
-                    if not children:
-                        catalog.logger.warning(
-                            f'No children in data catalog: {catalog.name} category_id: {category_id}')
-                        continue
-
-                    for index, child in enumerate(children):
-                        child_id = child.get('id')
-                        subcategories[f"{index}_-_{category_id}"] = child_id
             bar.finish()
 
-            bar = IncrementalBar(f'receive parts list', max=len(subcategories), suffix='%(index)d/%(max)d ')
-            for category_data, subcategory_id in subcategories.items():
-                category_id = category_data.split('_-_')[-1]
+            bar = IncrementalBar(f'receive PARTLISTS', max=len(children), suffix='%(index)d/%(max)d ')
+
+            for child in children:
                 bar.next()
-                response = catalog.get_category(category_id=subcategory_id)
+                children_list = child.get_children()
+                catalog.gategories[child.root_id].add_part_lists(children_list)
 
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request catalog: {catalog.name} category_id: {category_id} subcategory_id: {subcategory_id} {catalog.current_url}')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    catalog.logger.warning(
-                        f'No data in catalog: {catalog.name} category_id: {category_id} subcategory_id: {subcategory_id}')
-                    continue
-
-                for el in data:
-                    children = el.get('children')
-
-                    if not children:
-                        catalog.logger.warning(
-                            f'No children in data catalog: {catalog.name} category_id: {category_id} subcategory_id: {subcategory_id}')
-                        continue
-
-                    for index, child in enumerate(children):
-                        child_id = child.get('id')
-                        parts_list[f"{index}_-_{subcategory_id}_-_{category_id}"] = child_id
             bar.finish()
 
             bar = IncrementalBar(f'receive parts from parts list', max=len(parts_list), suffix='%(index)d/%(max)d ')
