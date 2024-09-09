@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 
 from progress.bar import IncrementalBar
@@ -21,7 +22,7 @@ class BaseCategory(ABC):
         self.children.append(child)
         return child
 
-    def get_children(self):
+    def get_children(self, test_api):
         response = self.catalog.get_category(category_id=self.id)
 
         if response.status_code != 200:
@@ -35,6 +36,9 @@ class BaseCategory(ABC):
             self.catalog.logger.warning(f'Note data in catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
             return False
 
+        if test_api:
+            data = data[:1]
+
         for subcategory in data:
             children = subcategory.get('children')
 
@@ -42,6 +46,9 @@ class BaseCategory(ABC):
                 self.catalog.logger.warning(
                     f'No children in data catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
                 continue
+
+            if test_api:
+                children = children[:1]
 
             for child_data in children:
                 child_id = child_data.get('id')
@@ -78,10 +85,14 @@ class Category(BaseCategory):
         part = create_part_instance(catalog=self.catalog, category=self, part_id=part_id)
         self.parts.append(part)
 
-    def get_parts(self):
+    def get_parts(self, test_api):
         bar = IncrementalBar(f'receive PARTS from PARTLISTS {self.name} ', max=len(self.part_lists), suffix='%(index)d/%(max)d ')
         for part_list in self.part_lists:
             bar.next()
+
+            if test_api:
+                time.sleep(0.2)
+
             response = self.catalog.get_parts(child_id=part_list.id)
 
             if response.status_code != 200:
@@ -95,6 +106,9 @@ class Category(BaseCategory):
                 self.catalog.logger.warning(
                     f'No Parts in {self.catalog.name} category_name: {self.name} category_id: {self.id} part_list_id: {part_list.id}')
                 continue
+
+            if test_api:
+                data = data[:1]
 
             for part in data:
                 part_id = part.get('id')

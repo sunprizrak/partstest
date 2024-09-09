@@ -11,14 +11,23 @@ class NoDataException(Exception):
 
 class BaseTestCatalog(ABC):
 
-    def test_root_categories(self, catalog):
+    def test_root_categories(self, catalog, test_api):
         data = catalog.get_data_root_categories()
 
         if data:
+
+            if test_api:
+                data = data[:1]
+
             bar = IncrementalBar(f'receive categories from {catalog.name} ', max=len(data), suffix='%(index)d/%(max)d ')
             for category_data in data:
                 bar.next()
-                time.sleep(0.1)
+
+                if test_api:
+                    time.sleep(0.2)
+                else:
+                    time.sleep(0.1)
+
                 category = catalog.add_category(data=category_data)
                 category.validate(data=category_data)
             bar.finish()
@@ -26,14 +35,14 @@ class BaseTestCatalog(ABC):
             catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog.name}')
 
     @abstractmethod
-    def test_tree(self, catalog):
+    def test_tree(self, catalog, test_api):
         pass
 
-    def test_parts(self, catalog):
+    def test_parts(self, catalog, test_api):
 
         for category in catalog.categories.values():
             if category.part_lists:
-                category.get_parts()
+                category.get_parts(test_api)
             else:
                 catalog.logger.warning(f'No PARTLISTS in {catalog.name} category_name: {category.name} category_id: {category.id})')
 
@@ -49,6 +58,10 @@ class BaseTestCatalog(ABC):
             bar = IncrementalBar(f'validate details in {catalog.name}', max=len(parts), suffix='%(index)d/%(max)d ')
             for part in parts:
                 bar.next()
+
+                if test_api:
+                    time.sleep(0.2)
+
                 response = catalog.get_part(part_id=part.id)
 
                 if response.status_code != 200:
@@ -70,18 +83,27 @@ class BaseTestCatalog(ABC):
 
 class TestLemkenCatalog(BaseTestCatalog):
 
-    def test_tree(self, catalog):
+    def test_tree(self, catalog, test_api):
         if catalog.categories:
-
             for category in catalog.categories.values():
-                children = category.get_children()
+                children = category.get_children(test_api)
 
-                bar = IncrementalBar(f'receive PARTLISTS from {category.name} id: {category.id} ', max=len(children), suffix='%(index)d/%(max)d ')
-                for child in children:
-                    bar.next()
-                    children_list = child.get_children()
-                    catalog.categories[child.root_id].add_part_lists(children_list)
-                bar.finish()
+                if children:
+                    if test_api:
+                        children = children[:1]
+
+                    bar = IncrementalBar(f'receive PARTLISTS from {category.name} id: {category.id} ', max=len(children), suffix='%(index)d/%(max)d ')
+                    for child in children:
+                        bar.next()
+
+                        if test_api:
+                            time.sleep(0.2)
+
+                        children_list = child.get_children(test_api)
+                        catalog.categories[child.root_id].add_part_lists(children_list)
+                    bar.finish()
+                else:
+                    catalog.logger.warning(f'No children in {catalog.name} category_name: {category.name} category_id: {category.id}')
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
@@ -721,17 +743,17 @@ class TestCatalog:
 
         return test_class()
 
-    def test_root_categories(self, catalog):
+    def test_root_categories(self, catalog, test_api):
         instance = self._get_test_instance(catalog)
-        instance.test_root_categories(catalog)
+        instance.test_root_categories(catalog, test_api)
 
-    def test_tree(self, catalog):
+    def test_tree(self, catalog, test_api):
         instance = self._get_test_instance(catalog)
-        instance.test_tree(catalog)
+        instance.test_tree(catalog, test_api)
 
-    def test_parts(self, catalog):
+    def test_parts(self, catalog, test_api):
         instance = self._get_test_instance(catalog)
-        instance.test_parts(catalog)
+        instance.test_parts(catalog, test_api)
 
 
 
