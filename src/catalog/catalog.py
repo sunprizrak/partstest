@@ -140,10 +140,11 @@ if __name__ == '__main__':
         print(f"{key}: {val}")
 
     print('---------Subcategories-----------------')
-    response = catalog.get_category(category_id=4)
+    response = catalog.get_category(category_id=6)
     data = response.json().get('data')
-    for el in data:
-        print(el)
+    for el in data[:1]:
+        for key, val in el.items():
+            print(f"{key}: {val}")
 
     # print('-----------Two_subcategories----------------------------------')
     # response = catalog.get_category(category_id=5)
@@ -164,8 +165,11 @@ if __name__ == '__main__':
     #     print(f"{key}: {val}")
     #
     # print('---------Parts------------------')
-    # response = catalog.get_parts(child_id=4998)
+    # response = catalog.get_parts(child_id=10)
     # data = response.json().get('data')
+    # print(data)
+    # print(f"len data: {len(data)}")
+    # print('<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>..')
     # for el in data:
     #     print(el)
 

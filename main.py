@@ -82,7 +82,6 @@ def start_app():
             data = response.json().get('data')
             if data:
                 brands = {brand.get('label'): brand.get('slug') for brand in data}
-                print(brands)
             else:
                 print(Fore.RED + f'No data in responuse {url}')
         else:
@@ -111,7 +110,6 @@ def open_menu(**kwargs):
 
     menu_list = [elem for elem in menu] + ['<<< назад >>>']
     message = "\nSelect Brand:"
-    brand_slug = None
 
     if kwargs.get('brand'):
         brand = kwargs.get('brand')
@@ -139,8 +137,8 @@ def open_menu(**kwargs):
     else:
         brand_slug = menu.get(choice)
         catalog_menu = {
-                'Тест каталога': 1,
-                'Тест дерева': 2,
+                'Тест каталога': f'-s -v tests/test_catalog.py::TestCatalog::test_root_categories tests/test_catalog.py::TestCatalog::test_tree tests/test_catalog.py::TestCatalog::test_parts --catalogs={brand_slug}',
+                'Тест дерева': f'-s -v tests/test_catalog.py::TestCatalog::test_root_categories tests/test_catalog.py::TestCatalog::test_tree --catalogs={brand_slug}',
                 'Тест корневых категорий': f'-s -v tests/test_catalog.py::TestCatalog::test_root_categories --catalogs={brand_slug}',
                 'Тест API': 4,
         },

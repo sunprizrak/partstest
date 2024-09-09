@@ -15,7 +15,7 @@ class BaseTestCatalog(ABC):
         data = catalog.get_data_root_categories()
 
         if data:
-            bar = IncrementalBar(f'{catalog.name} categories', max=len(data), suffix='%(index)d/%(max)d ')
+            bar = IncrementalBar(f'receive categories from {catalog.name} ', max=len(data), suffix='%(index)d/%(max)d ')
             for category_data in data:
                 bar.next()
                 time.sleep(0.1)
@@ -30,13 +30,17 @@ class BaseTestCatalog(ABC):
         pass
 
     def test_parts(self, catalog):
+
+        for category in catalog.categories.values():
+            category.get_parts()
+
         parts = []
 
-        for el in catalog.categories.values():
-            parts.extend(el.parts)
+        for category in catalog.categories.values():
+            parts.extend(category.parts)
 
         if parts:
-            bar = IncrementalBar(f'check fields in detail', max=len(parts), suffix='%(index)d/%(max)d ')
+            bar = IncrementalBar(f'validate details in {catalog.name}', max=len(parts), suffix='%(index)d/%(max)d ')
             for part in parts:
                 bar.next()
                 response = catalog.get_part(part_id=part.id)
@@ -61,55 +65,17 @@ class BaseTestCatalog(ABC):
 class TestLemkenCatalog(BaseTestCatalog):
 
     def test_tree(self, catalog):
-        self.test_root_categories(catalog=catalog)
-
         if catalog.categories:
-            children = []
 
-            bar = IncrementalBar(
-                f'receive children from root categories {catalog.name} ',
-                max=len(list(catalog.categories)), suffix='%(index)d/%(max)d ',
-            )
-            for category in list(catalog.categories.values()):
-                bar.next()
-                time.sleep(0.1)
-                children_list = category.get_children()
-                children.extend(children_list)
+            for category in catalog.categories.values():
+                children = category.get_children()
 
-            bar.finish()
-
-            bar = IncrementalBar(f'receive PARTLISTS', max=len(children), suffix='%(index)d/%(max)d ')
-
-            for child in children:
-                bar.next()
-                children_list = child.get_children()
-                catalog.gategories[child.root_id].add_part_lists(children_list)
-
-            bar.finish()
-
-            bar = IncrementalBar(f'receive parts from parts list', max=len(parts_list), suffix='%(index)d/%(max)d ')
-            for category_data, part_list_id in parts_list.items():
-                _, subcategory_id, category_id = category_data.split('_-_')
-                bar.next()
-                response = catalog.get_parts(child_id=part_list_id)
-
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request catalog: {catalog.name} category_id: {category_id} subcategory_id: {subcategory_id} part_list_id: {part_list_id} {catalog.current_url}')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    catalog.logger.warning(
-                        f'No Parts in {catalog.name} category_id: {category_id} subcategory_id: {subcategory_id} part_list_id: {part_list_id}')
-                    continue
-
-                for part in data:
-                    part_id = part.get('id')
-                    category = catalog.categories[int(category_id)]
-                    category.add_part(part_id=part_id)
-            bar.finish()
+                bar = IncrementalBar(f'receive PARTLISTS from {category.name} id: {category.id} ', max=len(children), suffix='%(index)d/%(max)d ')
+                for child in children:
+                    bar.next()
+                    children_list = child.get_children()
+                    catalog.categories[child.root_id].add_part_lists(children_list)
+                bar.finish()
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
@@ -737,7 +703,9 @@ class TestRopaCatalog(BaseTestCatalog):
 
 class TestCatalog:
     """class wrap for start test"""
-    def _get_test_instance(self, catalog):
+
+    @staticmethod
+    def _get_test_instance(catalog):
         catalog_name = catalog.name.capitalize()
         test_class_name = f"Test{catalog_name}Catalog"
         test_class = globals().get(test_class_name)
