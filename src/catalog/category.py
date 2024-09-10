@@ -68,6 +68,14 @@ class BaseCategory(ABC):
                 self.add_children(**kwargs_dict)
         return self.children
 
+    def __str__(self):
+        return f"{self.name} id:{self.id}"
+
+    def __repr__(self):
+        return f"{self.name} id:{self.id}"
+
+
+
 
 class Category(BaseCategory):
 
@@ -118,12 +126,6 @@ class Category(BaseCategory):
     @abstractmethod
     def validate(self, data: dict):
         pass
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return self.name
 
 
 class LemkenCategory(Category):
@@ -294,13 +296,15 @@ class RopaCategory(Category):
 
 def create_category_instance(catalog, category_id, name, data):
     cls = globals().get(f"{catalog.name.capitalize()}Category")
+    cleaned_name = name.strip().replace('\n', '')
     if cls is None:
         raise ValueError(f"Class {catalog.name.capitalize()}Category is not defined.")
-    return cls(catalog=catalog, category_id=category_id, name=name, data=data)
+    return cls(catalog=catalog, category_id=category_id, name=cleaned_name, data=data)
 
 
 def create_category_children_instance(catalog, child_id, child_name, data, root_id):
-    return BaseCategory(catalog=catalog, category_id=child_id, category_name=child_name, data=data, root_id=root_id)
+    cleaned_name = child_name.strip().replace('\n', '')
+    return BaseCategory(catalog=catalog, category_id=child_id, name=cleaned_name, data=data, root_id=root_id)
 
 
 if __name__ == '__main__':

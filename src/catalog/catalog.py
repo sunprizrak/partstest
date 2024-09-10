@@ -129,7 +129,7 @@ def create_catalog_instance(catalog_name):
 
 
 if __name__ == '__main__':
-    catalog = create_catalog_instance(catalog_name='lemken')
+    catalog = create_catalog_instance(catalog_name='claas')
     response = catalog.get_tree()
     data = response.json().get('data')
     print('---------Categories------------------------------------------')
@@ -140,8 +140,9 @@ if __name__ == '__main__':
         print(f"{key}: {val}")
 
     print('---------Subcategories-----------------')
-    response = catalog.get_category(category_id=6)
+    response = catalog.get_category(category_id=3)
     data = response.json().get('data')
+    print(f"количество sub {len(data)}")
     for el in data[:1]:
         for key, val in el.items():
             print(f"{key}: {val}")
@@ -165,7 +166,7 @@ if __name__ == '__main__':
     #     print(f"{key}: {val}")
     #
     # print('---------Parts------------------')
-    # response = catalog.get_parts(child_id=10)
+    # response = catalog.get_parts(child_id=402)
     # data = response.json().get('data')
     # print(data)
     # print(f"len data: {len(data)}")
