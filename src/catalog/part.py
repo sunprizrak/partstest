@@ -14,6 +14,12 @@ class Part(ABC):
     def validate(self, data: dict):
         pass
 
+    def __str__(self):
+        return f"detail id:{self.id}"
+
+    def __repr__(self):
+        return f"detail id:{self.id}"
+
 
 class LemkenPart(Part):
 

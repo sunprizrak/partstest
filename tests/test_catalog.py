@@ -9,15 +9,11 @@ class NoDataException(Exception):
         super().__init__(self.message)
 
 
-class BaseTestCatalog(ABC):
+class TestCatalogBase(ABC):
 
     def test_root_categories(self, catalog, test_api):
         data = catalog.get_data_root_categories()
         if data:
-
-            if test_api:
-                data = data[:1]
-
             bar = IncrementalBar(f'receive categories from {catalog.name} ', max=len(data), suffix='%(index)d/%(max)d ')
             for category_data in data:
                 bar.next()
@@ -80,7 +76,7 @@ class BaseTestCatalog(ABC):
             catalog.logger.warning(f'No parts in catalog: {catalog.name}')
 
 
-class TestLemkenCatalog(BaseTestCatalog):
+class TestLemkenCatalog(TestCatalogBase):
 
     def test_tree(self, catalog, test_api):
         if catalog.categories:
@@ -102,138 +98,116 @@ class TestLemkenCatalog(BaseTestCatalog):
                     bar.finish()
                 else:
                     catalog.logger.warning(f'No children in {catalog.name} category_name: {category.name} category_id: {category.id}')
+
+                if test_api:
+                    if category.part_lists:
+                        break
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
 
-class TestGrimmeCatalog(BaseTestCatalog):
-
-    def test_tree(self, catalog):
-        response = catalog.get_tree()
-
-        if response.status_code == 200:
-            data = response.json().get('data')
-
-            if data:
-                bar = IncrementalBar(f'{catalog.name} categories', max=len(data), suffix='%(index)d/%(max)d ')
-                for category_data in data:
-                    bar.next()
-                    time.sleep(0.1)
-                    category_id = category_data.get('id')
-                    catalog.add_category(category_id=category_id)
-                    catalog.categories[category_id].validate(data=category_data)
-
-                    models = category_data.get('children')
-
-                    if not models:
-                        catalog.logger.warning(
-                            f'No children(models) in data catalog: {catalog.name} category_id: {category_id}')
-                        continue
-
-                    for model in models:
-                        model_id = model.get('id')
-
-                        modifications = model.get('children')
-
-                        if not modifications:
-                            catalog.logger.warning(
-                                f'No children in data catalog: {catalog.name} category_id: {category_id} model_id: {model_id}')
-                            continue
-
-                        for modification in modifications:
-                            modification_id = modification.get('id')
-                            catalog.categories[category_id].modifications.append(f"{category_id}_-_{modification_id}")
-                bar.finish()
-
-                modifications = []
-
-                for el in catalog.categories.values():
-                    modifications.extend(el.modifications)
-
-                node_groups = []
-
-                bar = IncrementalBar(f'receive node_groups from modifications', max=len(modifications), suffix='%(index)d/%(max)d ')
-                for modification in modifications:
-                    bar.next()
-                    category_id, modification_id = modification.split('_-_')
-                    response = catalog.get_category(category_id=int(modification_id))
-
-                    if response.status_code != 200:
-                        catalog.logger.warning(
-                            f'Bad request catalog: {catalog.name} category_id: {modification_id} {catalog.current_url}')
-                        continue
-
-                    data = response.json().get('data')
-
-                    if not data:
-                        catalog.logger.warning(
-                            f'No data in catalog: {catalog.name} category_id: {modification_id}')
-                        continue
-
-                    for node_group in data:
-                        node_group_id = node_group.get('id')
-                        node_groups.append(f"{category_id}_-_{node_group_id}")
-                bar.finish()
-
-                nodes = []
-
-                bar = IncrementalBar(f'receive node from node_groups', max=len(node_groups), suffix='%(index)d/%(max)d ')
-                for node_group in node_groups:
-                    bar.next()
-                    category_id, node_group_id = node_group.split('_-_')
-                    response = catalog.get_category(category_id=int(node_group_id))
-
-                    if response.status_code != 200:
-                        catalog.logger.warning(
-                            f'Bad request catalog: {catalog.name} category_id: {node_group_id} {catalog.current_url}')
-                        continue
-
-                    data = response.json().get('data')
-
-                    if not data:
-                        catalog.logger.warning(
-                            f'No data in catalog: {catalog.name} category_id: {node_group_id}')
-                        continue
-
-                    for node in data:
-                        node_id = node.get('id')
-                        nodes.append(f"{category_id}_-_{node_id}")
-                bar.finish()
-
-                bar = IncrementalBar(f'receive parts from nodes', max=len(nodes), suffix='%(index)d/%(max)d ')
-                for node in nodes:
-                    bar.next()
-                    category_id, node_id = node.split('_-_')
-                    response = catalog.get_category(category_id=int(node_id))
-
-                    if response.status_code != 200:
-                        catalog.logger.warning(
-                            f'Bad request catalog: {catalog.name} category_id: {node_id} {catalog.current_url}')
-                        continue
-
-                    data = response.json().get('data')
-
-                    if not data:
-                        catalog.logger.warning(
-                            f'No data in catalog: {catalog.name} category_id: {node_id}')
-                        continue
-
-                    for part in data:
-                        part_id = part.get('id')
-                        category = catalog.categories[int(category_id)]
-                        category.add_part(part_id=part_id)
-                bar.finish()
-            else:
-                catalog.logger.warning(f'No data in {catalog.name} {catalog.current_url}')
-        else:
-            catalog.logger.warning(f'Bad request {catalog.name} {catalog.current_url}')
-
-
-class TestKubotaCatalog(BaseTestCatalog):
+class TestGrimmeCatalog(TestCatalogBase):
 
     def test_tree(self, catalog, test_api):
         if catalog.categories:
-            test_api = True  # for test develop
+
+            level_1 = list()
+
+            bar_message = "receive children"
+            bar = IncrementalBar(
+                message=bar_message,
+                max=len(catalog.categories),
+                suffix='%(index)d/%(max)d ',
+            )
+            for category in catalog.categories.values():
+                bar.message = f"{bar_message} from {category}"
+                bar.next()
+                children = category.get_children(test_api)
+
+                if not children:
+                    continue
+
+                if test_api:
+                    children = children[:1]
+
+                level_1.extend(children)
+
+                if test_api:
+                    break
+            bar.finish()
+
+            if level_1:
+                level_2 = list()
+
+                bar_message = "receive children"
+                bar = IncrementalBar(
+                    message=bar_message,
+                    max=len(level_1),
+                    suffix='%(index)d/%(max)d ',
+                )
+                for child in level_1:
+                    bar.message = f"{bar_message} from {child}"
+                    bar.next()
+                    children = child.get_children(test_api)
+
+                    if children:
+
+                        if test_api:
+                            children = children[:1]
+
+                        level_2.extend(children)
+                bar.finish()
+
+                if level_2:
+                    level_3 = list()
+
+                    bar_message = "receive children"
+                    bar = IncrementalBar(
+                        message=bar_message,
+                        max=len(level_2),
+                        suffix='%(index)d/%(max)d ',
+                    )
+                    for child in level_2:
+                        bar.message = f"{bar_message} from {child}"
+                        bar.next()
+                        children = child.get_children(test_api)
+
+                        if children:
+
+                            if test_api:
+                                children = children[:1]
+
+                            level_3.extend(children)
+                    bar.finish()
+
+                    if level_3:
+
+                        bar_message = "receive PARTLISTS"
+                        bar = IncrementalBar(
+                            message=bar_message,
+                            max=len(level_3),
+                            suffix='%(index)d/%(max)d ',
+                        )
+                        for child in level_3:
+                            bar.message = f"{bar_message} from {child}"
+                            bar.next()
+                            children_list = child.get_children(test_api)
+                            category = catalog.categories[child.root_id]
+                            category.add_part_lists(children_list)
+
+                            if test_api:
+                                if category.part_lists:
+                                    break
+                        bar.finish()
+
+        else:
+            catalog.logger.warning(f'No Categories in {catalog.name}')
+
+
+class TestKubotaCatalog(TestCatalogBase):
+
+    def test_tree(self, catalog, test_api):
+        if catalog.categories:
             for category in catalog.categories.values():
                 children = category.get_children(test_api)
 
@@ -255,13 +229,15 @@ class TestKubotaCatalog(BaseTestCatalog):
                 else:
                     catalog.logger.warning(
                         f'No children in {catalog.name} category_name: {category.name} category_id: {category.id}')
-            test = list(catalog.categories.values())[0]
-            print(test.part_lists)
+
+                if test_api:
+                    if category.part_lists:
+                        break
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
 
-class TestClaasCatalog(BaseTestCatalog):
+class TestClaasCatalog(TestCatalogBase):
 
     def test_tree(self, catalog, test_api):
         if catalog.categories:
@@ -289,8 +265,8 @@ class TestClaasCatalog(BaseTestCatalog):
                                 if test_api:
                                     time.sleep(0.2)
 
-                                children_list2 = child2.get_children(test_api)
-                                catalog.categories[child.root_id].add_part_lists(children_list2)
+                                children_list = child2.get_children(test_api)
+                                catalog.categories[child.root_id].add_part_lists(children_list)
                             bar.finish()
                         else:
                             catalog.logger.warning(
@@ -298,11 +274,15 @@ class TestClaasCatalog(BaseTestCatalog):
                 else:
                     catalog.logger.warning(
                         f'No children in {catalog.name} category_name: {category.name} category_id: {category.id}')
+
+                if test_api:
+                    if category.part_lists:
+                        break
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
 
-class TestKroneCatalog(BaseTestCatalog):
+class TestKroneCatalog(TestCatalogBase):
 
     def test_tree(self, catalog):
         self._get_root_categories(catalog=catalog)
@@ -412,7 +392,7 @@ class TestKroneCatalog(BaseTestCatalog):
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
 
-class TestKvernelandCatalog(BaseTestCatalog):
+class TestKvernelandCatalog(TestCatalogBase):
 
     def test_tree(self, catalog):
         self._get_root_categories(catalog=catalog)
@@ -524,10 +504,36 @@ class TestKvernelandCatalog(BaseTestCatalog):
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
 
-class TestRopaCatalog(BaseTestCatalog):
+class TestRopaCatalog(TestCatalogBase):
 
-    def test_tree(self, catalog):
-        pass
+    def test_tree(self, catalog, test_api):
+        if catalog.categories:
+            for category in catalog.categories.values():
+                children = category.get_children(test_api)
+                if children:
+                    if test_api:
+                        children = children[:1]
+
+                    bar = IncrementalBar(f'receive PARTLISTS from {category.name} id: {category.id} ',
+                                         max=len(children), suffix='%(index)d/%(max)d ')
+                    for child in children:
+                        bar.next()
+
+                        if test_api:
+                            time.sleep(0.2)
+
+                        children_list = child.get_children(test_api)
+                        catalog.categories[child.root_id].add_part_lists(children_list)
+                    bar.finish()
+                else:
+                    catalog.logger.warning(
+                        f'No children in {catalog.name} category_name: {category.name} category_id: {category.id}')
+
+                if test_api:
+                    if category.part_lists:
+                        break
+        else:
+            catalog.logger.warning(f'No Categories in {catalog.name}')
 
 
 class TestCatalog:
