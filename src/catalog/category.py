@@ -271,7 +271,8 @@ class GrimmeCategory(Category):
 
             for part in data:
                 part_id = part.get('id')
-                self.add_part(part_id=part_id)
+                part_name = part.get(self.name_label_part)
+                self.add_part(part_id=part_id, name=part_name)
         bar.finish()
 
     def validate(self, data: dict):
