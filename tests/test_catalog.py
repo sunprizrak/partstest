@@ -9,7 +9,33 @@ class NoDataException(Exception):
         super().__init__(self.message)
 
 
-class TestCatalogBase(ABC):
+class CatalogTestUtility:
+
+    @staticmethod
+    def get_children(categories: list, test_api, part_list=None):
+        children = []
+        bar_message = "receive children"
+        bar = IncrementalBar(
+            message=bar_message,
+            max=len(categories),
+            suffix='%(index)d/%(max)d ',
+        )
+        for category in categories:
+            bar.message = f"{bar_message} from {category}"
+            bar.next()
+            resp = category.get_children(test_api, part_list)
+
+            if resp:
+                if test_api:
+                    resp = resp[:1]
+
+                children.extend(resp)
+
+        bar.finish()
+        return children
+
+
+class TestCatalogBase(ABC, CatalogTestUtility):
 
     def test_root_categories(self, catalog, test_api):
         data = catalog.get_data_root_categories()
@@ -65,7 +91,11 @@ class TestCatalogBase(ABC):
                     continue
 
                 data = response.json().get('data')
-                print(data)  # for test
+                # for test
+                print('\n')
+                for key, val in data.items():
+                    print(f"{key}: {val}")
+                # end test
                 if not data:
                     catalog.logger.warning(f'No data in {catalog.name} Part_id: {part.id})')
                     continue
@@ -80,28 +110,37 @@ class TestLemkenCatalog(TestCatalogBase):
 
     def test_tree(self, catalog, test_api):
         if catalog.categories:
-            for category in catalog.categories.values():
-                children = category.get_children(test_api)
-                if children:
-                    if test_api:
-                        children = children[:1]
+            state_while = True
+            index = 0
 
-                    bar = IncrementalBar(f'receive PARTLISTS from {category.name} id: {category.id} ', max=len(children), suffix='%(index)d/%(max)d ')
-                    for child in children:
-                        bar.next()
-
-                        if test_api:
-                            time.sleep(0.2)
-
-                        children_list = child.get_children(test_api)
-                        catalog.categories[child.root_id].add_part_lists(children_list)
-                    bar.finish()
-                else:
-                    catalog.logger.warning(f'No children in {catalog.name} category_name: {category.name} category_id: {category.id}')
+            while state_while:
+                categories = list(catalog.categories.values())
 
                 if test_api:
-                    if category.part_lists:
-                        break
+                    categories = [list(catalog.categories.values())[index]]
+
+                level_1 = self.get_children(categories=categories, test_api=test_api)
+
+                if level_1:
+                    level_2 = self.get_children(categories=level_1, test_api=test_api)
+
+                    if level_2:
+                        if test_api:
+                            category = categories[0]
+                            category.add_part_lists(level_2)
+                            state_while = False
+                        else:
+                            for part_list in level_2:
+                                category = catalog.categories[part_list.root_id]
+                                category.add_part_lists(part_list)
+                            index += 1
+                    else:
+                        index += 1
+                else:
+                    index += 1
+
+                if index >= len(catalog.categories):
+                    state_while = False
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
@@ -110,96 +149,47 @@ class TestGrimmeCatalog(TestCatalogBase):
 
     def test_tree(self, catalog, test_api):
         if catalog.categories:
+            state_while = True
+            index = 0
 
-            level_1 = list()
-
-            bar_message = "receive children"
-            bar = IncrementalBar(
-                message=bar_message,
-                max=len(catalog.categories),
-                suffix='%(index)d/%(max)d ',
-            )
-            for category in catalog.categories.values():
-                bar.message = f"{bar_message} from {category}"
-                bar.next()
-                children = category.get_children(test_api)
-
-                if not children:
-                    continue
+            while state_while:
+                categories = list(catalog.categories.values())
 
                 if test_api:
-                    children = children[:1]
+                    categories = [list(catalog.categories.values())[index]]
 
-                level_1.extend(children)
+                level_1 = self.get_children(categories=categories, test_api=test_api)
 
-                if test_api:
-                    break
-            bar.finish()
+                if level_1:
+                    level_2 = self.get_children(categories=level_1, test_api=test_api)
 
-            if level_1:
-                level_2 = list()
+                    if level_2:
+                        level_3 = self.get_children(categories=level_2, test_api=test_api)
 
-                bar_message = "receive children"
-                bar = IncrementalBar(
-                    message=bar_message,
-                    max=len(level_1),
-                    suffix='%(index)d/%(max)d ',
-                )
-                for child in level_1:
-                    bar.message = f"{bar_message} from {child}"
-                    bar.next()
-                    children = child.get_children(test_api)
+                        if level_3:
+                            level_4 = self.get_children(categories=level_3, test_api=test_api)
 
-                    if children:
+                            if level_4:
+                                if test_api:
+                                    category = categories[0]
+                                    category.add_part_lists(level_4)
+                                    state_while = False
+                                else:
+                                    for part_list in level_3:
+                                        category = catalog.categories[part_list.root_id]
+                                        category.add_part_lists(part_list)
+                                    index += 1
+                            else:
+                                index += 1
+                        else:
+                            index += 1
+                    else:
+                        index += 1
+                else:
+                    index += 1
 
-                        if test_api:
-                            children = children[:1]
-
-                        level_2.extend(children)
-                bar.finish()
-
-                if level_2:
-                    level_3 = list()
-
-                    bar_message = "receive children"
-                    bar = IncrementalBar(
-                        message=bar_message,
-                        max=len(level_2),
-                        suffix='%(index)d/%(max)d ',
-                    )
-                    for child in level_2:
-                        bar.message = f"{bar_message} from {child}"
-                        bar.next()
-                        children = child.get_children(test_api)
-
-                        if children:
-
-                            if test_api:
-                                children = children[:1]
-
-                            level_3.extend(children)
-                    bar.finish()
-
-                    if level_3:
-
-                        bar_message = "receive PARTLISTS"
-                        bar = IncrementalBar(
-                            message=bar_message,
-                            max=len(level_3),
-                            suffix='%(index)d/%(max)d ',
-                        )
-                        for child in level_3:
-                            bar.message = f"{bar_message} from {child}"
-                            bar.next()
-                            children_list = child.get_children(test_api)
-                            category = catalog.categories[child.root_id]
-                            category.add_part_lists(children_list)
-
-                            if test_api:
-                                if category.part_lists:
-                                    break
-                        bar.finish()
-
+                if index >= len(catalog.categories):
+                    state_while = False
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
@@ -208,31 +198,37 @@ class TestKubotaCatalog(TestCatalogBase):
 
     def test_tree(self, catalog, test_api):
         if catalog.categories:
-            for category in catalog.categories.values():
-                children = category.get_children(test_api)
+            state_while = True
+            index = 0
 
-                if children:
-                    if test_api:
-                        children = children[:1]
-
-                    bar = IncrementalBar(f'receive PARTLISTS from {category.name} id: {category.id} ',
-                                         max=len(children), suffix='%(index)d/%(max)d ')
-                    for child in children:
-                        bar.next()
-
-                        if test_api:
-                            time.sleep(0.2)
-
-                        children_list = child.get_children(test_api)
-                        catalog.categories[child.root_id].add_part_lists(children_list)
-                    bar.finish()
-                else:
-                    catalog.logger.warning(
-                        f'No children in {catalog.name} category_name: {category.name} category_id: {category.id}')
+            while state_while:
+                categories = list(catalog.categories.values())
 
                 if test_api:
-                    if category.part_lists:
-                        break
+                    categories = [list(catalog.categories.values())[index]]
+
+                level_1 = self.get_children(categories=categories, test_api=test_api)
+
+                if level_1:
+                    level_2 = self.get_children(categories=level_1, test_api=test_api)
+
+                    if level_2:
+                        if test_api:
+                            category = categories[0]
+                            category.add_part_lists(level_2)
+                            state_while = False
+                        else:
+                            for part_list in level_2:
+                                category = catalog.categories[part_list.root_id]
+                                category.add_part_lists(part_list)
+                            index += 1
+                    else:
+                        index += 1
+                else:
+                    index += 1
+
+                if index >= len(catalog.categories):
+                    state_while = False
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
@@ -241,265 +237,125 @@ class TestClaasCatalog(TestCatalogBase):
 
     def test_tree(self, catalog, test_api):
         if catalog.categories:
-            for category in catalog.categories.values():
-                children = category.get_children(test_api)
+            state_while = True
+            index = 0
 
-                if children:
-                    if test_api:
-                        children = children[:1]
-
-                    for child in children:
-                        children2 = child.get_children(test_api)
-
-                        if children2:
-                            if test_api:
-                                children2 = children2[:1]
-
-                            bar = IncrementalBar(
-                                f'receive PARTLISTS from {child.name} id: {child.id} ',
-                                max=len(children2), suffix='%(index)d/%(max)d ',
-                            )
-                            for child2 in children2:
-                                bar.next()
-
-                                if test_api:
-                                    time.sleep(0.2)
-
-                                children_list = child2.get_children(test_api)
-                                catalog.categories[child.root_id].add_part_lists(children_list)
-                            bar.finish()
-                        else:
-                            catalog.logger.warning(
-                                f'No children in {catalog.name} category_name: {child.name} category_id: {child.id}')
-                else:
-                    catalog.logger.warning(
-                        f'No children in {catalog.name} category_name: {category.name} category_id: {category.id}')
+            while state_while:
+                categories = list(catalog.categories.values())
 
                 if test_api:
-                    if category.part_lists:
-                        break
+                    categories = [list(catalog.categories.values())[index]]
+
+                level_1 = self.get_children(categories=categories, test_api=test_api)
+
+                if level_1:
+                    level_2 = self.get_children(categories=level_1, test_api=test_api)
+
+                    if level_2:
+                        level_3 = self.get_children(categories=level_2, test_api=test_api)
+
+                        if level_3:
+                            if test_api:
+                                category = categories[0]
+                                category.add_part_lists(level_3)
+                                state_while = False
+                            else:
+                                for part_list in level_3:
+                                    category = catalog.categories[part_list.root_id]
+                                    category.add_part_lists(part_list)
+                                index += 1
+                        else:
+                            index += 1
+                    else:
+                        index += 1
+                else:
+                    index += 1
+
+                if index >= len(catalog.categories):
+                    state_while = False
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
 
 class TestKroneCatalog(TestCatalogBase):
 
-    def test_tree(self, catalog):
-        self._get_root_categories(catalog=catalog)
-
+    def test_tree(self, catalog, test_api):
         if catalog.categories:
-            part_groups = dict()
-            part_lists = dict()
+            state_while = True
+            index = 0
 
-            bar = IncrementalBar(f'receive PART_GROUPS from {catalog.name} categories', max=len(list(catalog.categories)),
-                                 suffix='%(index)d/%(max)d ')
-            for category_id in list(catalog.categories):
-                bar.next()
-                response = catalog.get_category(category_id=category_id)
+            while state_while:
+                categories = list(catalog.categories.values())
 
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request catalog: {catalog.name} category_id: {category_id} {catalog.current_url}')
-                    continue
+                if test_api:
+                    categories = [list(catalog.categories.values())[index]]
 
-                data = response.json().get('data')
+                level_1 = self.get_children(categories=categories, test_api=test_api)
 
-                if not data:
-                    catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category_id}')
-                    continue
+                if level_1:
+                    level_2 = self.get_children(categories=level_1, test_api=test_api)
 
-                children = data[0].get('children')
+                    if level_2:
+                        level_3 = self.get_children(categories=level_2, test_api=test_api, part_list=True)
 
-                if not children:
-                    catalog.logger.warning(
-                        f'No children in data catalog: {catalog.name} category_id: {category_id}')
-                    continue
+                        if level_3:
+                            if test_api:
+                                category = categories[0]
+                                category.add_part_lists(level_3)
+                                state_while = False
+                            else:
+                                for part_list in level_3:
+                                    category = catalog.categories[part_list.root_id]
+                                    category.add_part_lists(part_list)
+                                index += 1
+                        else:
+                            index += 1
+                    else:
+                        index += 1
+                else:
+                    index += 1
 
-                for part_group in children:
-                    part_group_id = part_group.get('id')
-                    response2 = catalog.get_category(category_id=part_group_id)
-
-                    if response.status_code != 200:
-                        catalog.logger.warning(
-                            f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_group: {part_group_id}')
-                        continue
-
-                    data2 = response2.json().get('data')
-
-                    if not data2:
-                        catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category_id} part_group: {part_group_id}')
-                        continue
-
-                    children2 = data2[0].get('children')
-
-                    if not children2:
-                        catalog.logger.warning(
-                            f'No children in data catalog: {catalog.name} category_id: {category_id} part_group_id: {part_group_id}')
-                        continue
-
-                    for index, part_group2 in enumerate(children2):
-                        part_group2_id = part_group2.get('id')
-                        part_groups[f"{index}_-_{category_id}"] = part_group2_id
-            bar.finish()
-
-            bar = IncrementalBar(f'receive PART_LISTS from PART_GROUPS', max=len(part_groups), suffix='%(index)d/%(max)d ')
-            for category_data, part_group_id in part_groups.items():
-                bar.next()
-                category_id = category_data.split('_-_')[-1]
-                response = catalog.get_category(category_id=part_group_id)
-
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_group_id: {part_group_id}')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    catalog.logger.warning(
-                        f'No data in catalog: {catalog.name} category_id: {category_id} part_group_id: {part_group_id}')
-                    continue
-
-                for index, part_list in enumerate(data):
-                    part_list_id = part_list.get('id')
-                    part_lists[f"{index}_-_{part_group_id}_-_{category_id}"] = part_list_id
-            bar.finish()
-
-            bar = IncrementalBar(f'receive parts from part_lists', max=len(part_lists), suffix='%(index)d/%(max)d ')
-            for category_data, part_list_id in part_lists.items():
-                bar.next()
-                _, part_group_id, category_id = category_data.split('_-_')
-                response = catalog.get_parts(child_id=part_list_id)
-
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_group_id: {part_group_id} part_list_id: {part_list_id}')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    catalog.logger.warning(
-                        f'No Parts in {catalog.name} category_id: {category_id} part_group_id: {part_group_id} part_list_id: {part_list_id}')
-                    continue
-
-                for part in data:
-                    part_id = part.get('id')
-                    category = catalog.categories[int(category_id)]
-                    category.add_part(part_id=part_id)
-            bar.finish()
+                if index >= len(catalog.categories):
+                    state_while = False
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
 
 class TestKvernelandCatalog(TestCatalogBase):
 
-    def test_tree(self, catalog):
-        self._get_root_categories(catalog=catalog)
-
+    def test_tree(self, catalog, test_api):
         if catalog.categories:
-            subcategories = dict()
-            part_lists = dict()
+            state_while = True
+            index = 0
 
-            bar = IncrementalBar(f'receive subcategories from {catalog.name} categories',
-                                 max=len(list(catalog.categories)[:1]),
-                                 suffix='%(index)d/%(max)d ')
-            for category_id in list(catalog.categories)[:1]:
-                bar.next()
-                response = catalog.get_category(category_id=category_id)
+            while state_while:
+                categories = list(catalog.categories.values())
 
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request catalog: {catalog.name} category_id: {category_id} {catalog.current_url}')
-                    continue
+                if test_api:
+                    categories = [list(catalog.categories.values())[index]]
 
-                data = response.json().get('data')
+                level_1 = self.get_children(categories=categories, test_api=test_api)
 
-                if not data:
-                    catalog.logger.warning(f'Note data in catalog: {catalog.name} category_id: {category_id}')
-                    continue
+                if level_1:
+                    level_2 = self.get_children(categories=level_1, test_api=test_api)
 
-                children = data[0].get('children')
+                    if level_2:
+                        if test_api:
+                            category = categories[0]
+                            category.add_part_lists(level_2)
+                            state_while = False
+                        else:
+                            for part_list in level_2:
+                                category = catalog.categories[part_list.root_id]
+                                category.add_part_lists(part_list)
+                            index += 1
+                    else:
+                        index += 1
+                else:
+                    index += 1
 
-                if not children:
-                    catalog.logger.warning(
-                        f'No children in data catalog: {catalog.name} category_id: {category_id}')
-                    continue
-
-                for child in children:
-                    child_id = child.get('id')
-                    response2 = catalog.get_category(category_id=child_id)
-
-                    if response.status_code != 200:
-                        catalog.logger.warning(
-                            f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_list: {child_id}')
-                        continue
-
-                    data2 = response2.json().get('data')
-
-                    if not data2:
-                        catalog.logger.warning(
-                            f'Note data in catalog: {catalog.name} category_id: {category_id} part_list: {child_id}')
-                        continue
-
-                    children2 = data2[0].get('children')
-
-                    if not children2:
-                        catalog.logger.warning(
-                            f'No children in data catalog: {catalog.name} category_id: {category_id} part_group_id: {child_id}')
-                        continue
-
-                    for index, child2 in enumerate(children2):
-                        child2_id = child2.get('id')
-                        subcategories[f"{index}_-_{category_id}"] = child2_id
-            bar.finish()
-
-            bar = IncrementalBar(f'receive PART_LISTS from subcategories', max=len(subcategories), suffix='%(index)d/%(max)d ')
-            for category_data, subcategory_id in subcategories.items():
-                bar.next()
-                category_id = category_data.split('_-_')[-1]
-                response = catalog.get_category(category_id=subcategory_id)
-
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} subcategory_id: {subcategory_id}')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    catalog.logger.warning(
-                        f'No data in catalog: {catalog.name} category_id: {category_id} subcategory_id: {subcategory_id}')
-                    continue
-
-                for index, part_list in enumerate(data):
-                    part_list_id = part_list.get('id')
-                    part_lists[f"{index}_-_{subcategory_id}_-_{category_id}"] = part_list_id
-            bar.finish()
-
-            bar = IncrementalBar(f'receive parts from part_lists', max=len(part_lists), suffix='%(index)d/%(max)d ')
-            for category_data, part_list_id in part_lists.items():
-                bar.next()
-                _, subcategory_id, category_id = category_data.split('_-_')
-                response = catalog.get_parts(child_id=part_list_id)
-
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request {catalog.current_url}: {catalog.name} category_id: {category_id} part_group_id: {subcategory_id} part_list_id: {part_list_id}')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    catalog.logger.warning(
-                        f'No Parts in {catalog.name} category_id: {category_id} part_group_id: {subcategory_id} part_list_id: {part_list_id}')
-                    continue
-
-                for part in data:
-                    part_id = part.get('id')
-                    category = catalog.categories[int(category_id)]
-                    category.add_part(part_id=part_id)
-            bar.finish()
+                if index >= len(catalog.categories):
+                    state_while = False
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 
@@ -508,30 +364,81 @@ class TestRopaCatalog(TestCatalogBase):
 
     def test_tree(self, catalog, test_api):
         if catalog.categories:
-            for category in catalog.categories.values():
-                children = category.get_children(test_api)
-                if children:
-                    if test_api:
-                        children = children[:1]
+            state_while = True
+            index = 0
 
-                    bar = IncrementalBar(f'receive PARTLISTS from {category.name} id: {category.id} ',
-                                         max=len(children), suffix='%(index)d/%(max)d ')
-                    for child in children:
-                        bar.next()
-
-                        if test_api:
-                            time.sleep(0.2)
-
-                        children_list = child.get_children(test_api)
-                        catalog.categories[child.root_id].add_part_lists(children_list)
-                    bar.finish()
-                else:
-                    catalog.logger.warning(
-                        f'No children in {catalog.name} category_name: {category.name} category_id: {category.id}')
+            while state_while:
+                categories = list(catalog.categories.values())
 
                 if test_api:
-                    if category.part_lists:
-                        break
+                    categories = [list(catalog.categories.values())[index]]
+
+                level_1 = self.get_children(categories=categories, test_api=test_api)
+
+                if level_1:
+                    level_2 = self.get_children(categories=level_1, test_api=test_api)
+
+                    if level_2:
+                        if test_api:
+                            category = categories[0]
+                            category.add_part_lists(level_2)
+                            state_while = False
+                        else:
+                            for part_list in level_2:
+                                category = catalog.categories[part_list.root_id]
+                                category.add_part_lists(part_list)
+                            index += 1
+                    else:
+                        index += 1
+                else:
+                    index += 1
+
+                if index >= len(catalog.categories):
+                    state_while = False
+        else:
+            catalog.logger.warning(f'No Categories in {catalog.name}')
+
+
+class TestJdeereCatalog(TestCatalogBase):
+
+    def test_tree(self, catalog, test_api):
+        if catalog.categories:
+            state_while = True
+            index = 0
+
+            while state_while:
+                categories = list(catalog.categories.values())
+
+                if test_api:
+                    categories = [list(catalog.categories.values())[index]]
+
+                level_1 = self.get_children(categories=categories, test_api=test_api)
+
+                if level_1:
+                    level_2 = self.get_children(categories=level_1, test_api=test_api)
+
+                    if level_2:
+                        level_3 = self.get_children(categories=level_2, test_api=test_api, part_list=True)
+
+                        if level_3:
+                            if test_api:
+                                category = categories[0]
+                                category.add_part_lists(level_3)
+                                state_while = False
+                            else:
+                                for part_list in level_3:
+                                    category = catalog.categories[part_list.root_id]
+                                    category.add_part_lists(part_list)
+                                index += 1
+                        else:
+                            index += 1
+                    else:
+                        index += 1
+                else:
+                    index += 1
+
+                if index >= len(catalog.categories):
+                    state_while = False
         else:
             catalog.logger.warning(f'No Categories in {catalog.name}')
 

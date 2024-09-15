@@ -64,8 +64,7 @@ class Category(ABC):
                 self.add_part(part_id=part_id)
         bar.finish()
 
-    @abstractmethod
-    def get_children(self, test_api):
+    def get_children(self, test_api, part_list=None):
         response = self.catalog.get_category(category_id=self.id)
 
         if response.status_code != 200:
@@ -84,7 +83,10 @@ class Category(ABC):
             data = data[:1]
 
         for subcategory in data:
-            children = subcategory.get('children')
+            if part_list:
+                children = data
+            else:
+                children = subcategory.get('children')
 
             if not children:
                 self.catalog.logger.warning(
@@ -101,7 +103,7 @@ class Category(ABC):
                 kwargs_dict = {
                     'child_id': child_id,
                     'child_name': child_name,
-                    'data': data,
+                    'data': child_data,
                 }
 
                 if hasattr(self, 'root_id'):
@@ -111,6 +113,54 @@ class Category(ABC):
 
                 self.add_children(**kwargs_dict)
         return self.children
+
+    # @abstractmethod
+    # def get_children(self, test_api, part_list):
+    #     response = self.catalog.get_category(category_id=self.id)
+    #
+    #     if response.status_code != 200:
+    #         self.catalog.logger.warning(
+    #             f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+    #         return False
+    #
+    #     data = response.json().get('data')
+    #
+    #     if not data:
+    #         self.catalog.logger.warning(
+    #             f'Note data in catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+    #         return False
+    #
+    #     if test_api:
+    #         data = data[:1]
+    #
+    #     for subcategory in data:
+    #         children = subcategory.get('children')
+    #
+    #         if not children:
+    #             self.catalog.logger.warning(
+    #                 f'No children in data catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+    #             continue
+    #
+    #         if test_api:
+    #             children = children[:1]
+    #
+    #         for child_data in children:
+    #             child_id = child_data.get('id')
+    #             child_name = child_data.get(self.catalog.name_label_category)
+    #
+    #             kwargs_dict = {
+    #                 'child_id': child_id,
+    #                 'child_name': child_name,
+    #                 'data': child_data,
+    #             }
+    #
+    #             if hasattr(self, 'root_id'):
+    #                 kwargs_dict['root_id'] = self.root_id
+    #             else:
+    #                 kwargs_dict['root_id'] = self.id
+    #
+    #             self.add_children(**kwargs_dict)
+    #     return self.children
 
     @abstractmethod
     def validate(self, data: dict):
@@ -150,8 +200,8 @@ class LemkenCategory(Category):
                 self.catalog.logger.warning(
                     f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
 
-    def get_children(self, test_api):
-        return super().get_children(test_api)
+    def get_children(self, test_api, part_list=None):
+        return super().get_children(test_api, part_list)
 
     def get_parts(self, test_api):
         return super().get_parts(test_api)
@@ -184,8 +234,8 @@ class KubotaCategory(Category):
                 self.catalog.logger.warning(
                     f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
 
-    def get_children(self, test_api):
-        return super().get_children(test_api)
+    def get_children(self, test_api, part_list=None):
+        return super().get_children(test_api, part_list)
 
     def get_parts(self, test_api):
         return super().get_parts(test_api)
@@ -200,7 +250,7 @@ class GrimmeCategory(Category):
             'children', 'created_at', 'updated_at',
         }
 
-    def get_children(self, test_api):
+    def get_children(self, test_api, part_list=None):
         response = self.catalog.get_category(category_id=self.id)
 
         if response.status_code != 200:
@@ -225,7 +275,7 @@ class GrimmeCategory(Category):
             kwargs_dict = {
                 'child_id': child_id,
                 'child_name': child_name,
-                'data': children,
+                'data': child_data,
             }
 
             if hasattr(self, 'root_id'):
@@ -290,6 +340,55 @@ class KroneCategory(Category):
     def validate(self, data: dict):
         pass
 
+    def get_children(self, test_api, part_list=None):
+        response = self.catalog.get_category(category_id=self.id)
+
+        if response.status_code != 200:
+            self.catalog.logger.warning(
+                f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+            return False
+
+        data = response.json().get('data')
+
+        if not data:
+            self.catalog.logger.warning(
+                f'Note data in catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+            return False
+
+        if part_list:
+            children = data
+        else:
+            children = data[0].get('children')
+
+        if not children:
+            self.catalog.logger.warning(
+                f'No children in data catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+            return False
+
+        if test_api:
+            children = children[:1]
+
+        for child_data in children:
+            child_id = child_data.get('id')
+            child_name = child_data.get(self.catalog.name_label_category)
+
+            kwargs_dict = {
+                'child_id': child_id,
+                'child_name': child_name,
+                'data': child_data,
+            }
+
+            if hasattr(self, 'root_id'):
+                kwargs_dict['root_id'] = self.root_id
+            else:
+                kwargs_dict['root_id'] = self.id
+
+            self.add_children(**kwargs_dict)
+        return self.children
+
+    def get_parts(self, test_api):
+        return super().get_parts(test_api)
+
 
 class KvernelandCategory(Category):
     def __init__(self, *args, **kwargs):
@@ -301,6 +400,12 @@ class KvernelandCategory(Category):
 
     def validate(self, data: dict):
         pass
+
+    def get_parts(self, test_api):
+        return super().get_parts(test_api)
+
+    def get_children(self, test_api, part_list=None):
+        return super().get_children(test_api, part_list)
 
 
 class JdeereCategory(Category):
@@ -314,6 +419,59 @@ class JdeereCategory(Category):
 
     def validate(self, data: dict):
         pass
+
+    def get_parts(self, test_api):
+        return super().get_parts(test_api)
+
+    def get_children(self, test_api, part_list=None):
+        response = self.catalog.get_category(category_id=self.id)
+
+        if response.status_code != 200:
+            self.catalog.logger.warning(
+                f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+            return False
+
+        data = response.json().get('data')
+
+        if not data:
+            self.catalog.logger.warning(
+                f'Note data in catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+            return False
+
+        if test_api:
+            data = data[:1]
+
+        for subcategory in data:
+            if part_list:
+                children = data
+            else:
+                children = subcategory.get('children')
+
+            if not children:
+                self.catalog.logger.warning(
+                    f'No children in data catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+                continue
+
+            if test_api:
+                children = children[:1]
+
+            for child_data in children:
+                child_id = child_data.get('id')
+                child_name = child_data.get(self.catalog.name_label_category)
+
+                kwargs_dict = {
+                    'child_id': child_id,
+                    'child_name': child_name,
+                    'data': child_data,
+                }
+
+                if hasattr(self, 'root_id'):
+                    kwargs_dict['root_id'] = self.root_id
+                else:
+                    kwargs_dict['root_id'] = self.id
+
+                self.add_children(**kwargs_dict)
+        return self.children
 
 
 class ClaasCategory(Category):
@@ -343,8 +501,8 @@ class ClaasCategory(Category):
                 self.catalog.logger.warning(
                     f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
 
-    def get_children(self, test_api):
-        return super().get_children(test_api)
+    def get_children(self, test_api, part_list=None):
+        return super().get_children(test_api, part_list)
 
     def get_parts(self, test_api):
         return super().get_parts(test_api)
@@ -376,8 +534,8 @@ class RopaCategory(Category):
                 self.catalog.logger.warning(
                     f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
 
-    def get_children(self, test_api):
-        return super().get_children(test_api)
+    def get_children(self, test_api, part_list=None):
+        return super().get_children(test_api, part_list)
 
     def get_parts(self, test_api):
         return super().get_parts(test_api)

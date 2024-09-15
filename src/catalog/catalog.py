@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from abc import ABC, abstractmethod
 from src.catalog.category import create_category_instance, LemkenCategory
+import time
 
 
 class Catalog(ABC):
@@ -58,28 +59,54 @@ class Catalog(ABC):
         logger.addHandler(file_handler)
         return logger
 
+    def _make_request(self, url, retries=5, delay=2, timeout=10):
+        """
+        Выполняет запрос с повторными попытками в случае таймаута.
+        :param url: URL для запроса
+        :param retries: Количество попыток
+        :param delay: Задержка между попытками (в секундах)
+        :param timeout: Время ожидания ответа от сервера
+        :return: Ответ от сервера или None
+        """
+        for attempt in range(1, retries + 1):
+            try:
+                response = requests.get(url, timeout=timeout)
+                response.raise_for_status()
+                return response
+            except requests.exceptions.ConnectTimeout:
+                self.logger.warning(f"Таймаут подключения {url}. Попытка {attempt} не удалась.")
+            except requests.exceptions.ReadTimeout:
+                self.logger.warning(f"Таймаут чтения данных {url}. Попытка {attempt} не удалась.")
+            except requests.exceptions.RequestException as e:
+                self.logger.warning(f"Ошибка: {e}")
+                break
+            if attempt < retries:
+                time.sleep(delay)
+        self.logger.warning(f"Все попытки исчерпаны. Запрос {url} не выполнен.")
+        return
+
     def get_tree(self):
         url = f"{self.api_url}/{self.name}/catalog/tree"
         self.current_url = url
-        resp = requests.get(url)
+        resp = self._make_request(url=url)
         return resp
 
     def get_category(self, category_id):
         url = f"{self.api_url}/{self.name}/catalog/{category_id}"
         self.current_url = url
-        resp = requests.get(url)
+        resp = self._make_request(url=url)
         return resp
 
     def get_parts(self, child_id):
         url = f"{self.api_url}/{self.name}/catalog/{child_id}/parts"
         self.current_url = url
-        resp = requests.get(url)
+        resp = self._make_request(url=url)
         return resp
 
     def get_part(self, part_id):
         url = f"{self.api_url}/{self.name}/part/{part_id}"
         self.current_url = url
-        resp = requests.get(url)
+        resp = self._make_request(url=url)
         return resp
 
     def __repr__(self):
@@ -136,16 +163,16 @@ if __name__ == '__main__':
     print(f"колличество категорий: {len(data)}")
     print(f'type data : {type(data)}')
     print('---------category[0]-------------------------------------------')
-    for key, val in data[0].items():
+    for key, val in data[6].items():
         print(f"{key}: {val}")
 
-    print('---------Subcategories-----------------')
-    response = catalog.get_category(category_id=3)
-    data = response.json().get('data')
-    print(f"количество sub {len(data)}")
-    for el in data[:1]:
-        for key, val in el.items():
-            print(f"{key}: {val}")
+    # print('---------Subcategories-----------------')
+    # response = catalog.get_category(category_id=657132)
+    # data = response.json().get('data')
+    # print(f"количество sub {len(data)}")
+    # for el in data[:1]:
+    #     for key, val in el.items():
+    #         print(f"{key}: {val}")
 
     # print('-----------Two_subcategories----------------------------------')
     # response = catalog.get_category(category_id=12)
