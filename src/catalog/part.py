@@ -3,10 +3,11 @@ from abc import ABC, abstractmethod
 
 class Part(ABC):
 
-    def __init__(self, catalog, category, part_id):
-        self.catalog = catalog
-        self.category = category
-        self.id = part_id
+    def __init__(self, *args, **kwargs):
+        self.catalog = kwargs.get('catalog')
+        self.category = kwargs.get('category')
+        self.id = kwargs.get('part_id')
+        self.name = kwargs.get('name')
         self.validation_fields = set()
         self.validation_image_fields = set()
 
@@ -15,16 +16,16 @@ class Part(ABC):
         pass
 
     def __str__(self):
-        return f"detail id:{self.id}"
+        return f"{self.name} id:{self.id}"
 
     def __repr__(self):
-        return f"detail id:{self.id}"
+        return f"{self.name} id:{self.id}"
 
 
 class LemkenPart(Part):
 
-    def __init__(self, catalog, category, part_id):
-        super(LemkenPart, self).__init__(catalog, category, part_id)
+    def __init__(self, *args, **kwargs):
+        super(LemkenPart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
             'part_number', 'position', 'dimension',
@@ -60,8 +61,8 @@ class LemkenPart(Part):
 
 
 class KubotaPart(Part):
-    def __init__(self, catalog, category, part_id):
-        super(KubotaPart, self).__init__(catalog, category, part_id)
+    def __init__(self, *args, **kwargs):
+        super(KubotaPart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
             'part_number', 'position', 'dimension',
@@ -97,8 +98,8 @@ class KubotaPart(Part):
 
 
 class ClaasPart(Part):
-    def __init__(self, catalog, category, part_id):
-        super(ClaasPart, self).__init__(catalog, category, part_id)
+    def __init__(self, *args, **kwargs):
+        super(ClaasPart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
             'part_number', 'position', 'dimension',
@@ -137,8 +138,8 @@ class ClaasPart(Part):
 
 class RopaPart(Part):
 
-    def __init__(self, catalog, category, part_id):
-        super(RopaPart, self).__init__(catalog, category, part_id)
+    def __init__(self, *args, **kwargs):
+        super(RopaPart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
             'part_number', 'position', 'dimension',
@@ -177,8 +178,8 @@ class RopaPart(Part):
 
 class GrimmePart(Part):
 
-    def __init__(self, catalog, category, part_id):
-        super(GrimmePart, self).__init__(catalog, category, part_id)
+    def __init__(self, *args, **kwargs):
+        super(GrimmePart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
             'part_number', 'position', 'dimension',
@@ -216,8 +217,8 @@ class GrimmePart(Part):
 
 
 class KronePart(Part):
-    def __init__(self, catalog, category, part_id):
-        super(KronePart, self).__init__(catalog, category, part_id)
+    def __init__(self, *args, **kwargs):
+        super(KronePart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
             'part_number', 'position', 'dimension',
@@ -255,8 +256,8 @@ class KronePart(Part):
 
 
 class KvernelandPart(Part):
-    def __init__(self, catalog, category, part_id):
-        super(KvernelandPart, self).__init__(catalog, category, part_id)
+    def __init__(self, *args, **kwargs):
+        super(KvernelandPart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
             'part_number', 'position', 'dimension',
@@ -294,8 +295,8 @@ class KvernelandPart(Part):
 
 
 class JdeerePart(Part):
-    def __init__(self, catalog, category, part_id):
-        super(JdeerePart, self).__init__(catalog, category, part_id)
+    def __init__(self, *args, **kwargs):
+        super(JdeerePart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
             'part_number', 'position', 'dimension',
@@ -332,8 +333,8 @@ class JdeerePart(Part):
                 f'No part_category in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
 
 
-def create_part_instance(catalog, category, part_id):
+def create_part_instance(catalog, category, part_id, name):
     cls = globals().get(f"{catalog.name.capitalize()}Part")
     if cls is None:
         raise ValueError(f"Class {catalog.name.capitalize()}Part is not defined.")
-    return cls(catalog, category, part_id)
+    return cls(catalog=catalog, category=category, part_id=part_id, name=name)

@@ -7,6 +7,7 @@ from src.catalog.part import create_part_instance
 
 
 class Category(ABC):
+    name_label_part = 'name'
 
     def __init__(self, *args, **kwargs):
         self.catalog = kwargs.get('catalog')
@@ -29,16 +30,14 @@ class Category(ABC):
     def add_part_lists(self, part_list):
         self.part_lists.extend(part_list)
 
-    def add_part(self, part_id):
-        part = create_part_instance(catalog=self.catalog, category=self, part_id=part_id)
+    def add_part(self, part_id, name):
+        part = create_part_instance(catalog=self.catalog, category=self, part_id=part_id, name=name)
         self.parts.append(part)
 
     @abstractmethod
     def get_parts(self, test_api):
         bar = IncrementalBar(f'receive PARTS from PARTLISTS {self.name} ', max=len(self.part_lists), suffix='%(index)d/%(max)d ')
         for part_list in self.part_lists:
-            bar.next()
-
             if test_api:
                 time.sleep(0.2)
 
@@ -61,10 +60,13 @@ class Category(ABC):
 
             for part in data:
                 part_id = part.get('id')
-                self.add_part(part_id=part_id)
+                part_name = part.get(self.name_label_part)
+                self.add_part(part_id=part_id, name=part_name)
+            bar.next()
         bar.finish()
 
-    def get_children(self, test_api, part_list=None):
+    @abstractmethod
+    def get_children(self, test_api, part_list):
         response = self.catalog.get_category(category_id=self.id)
 
         if response.status_code != 200:
@@ -113,54 +115,6 @@ class Category(ABC):
 
                 self.add_children(**kwargs_dict)
         return self.children
-
-    # @abstractmethod
-    # def get_children(self, test_api, part_list):
-    #     response = self.catalog.get_category(category_id=self.id)
-    #
-    #     if response.status_code != 200:
-    #         self.catalog.logger.warning(
-    #             f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-    #         return False
-    #
-    #     data = response.json().get('data')
-    #
-    #     if not data:
-    #         self.catalog.logger.warning(
-    #             f'Note data in catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-    #         return False
-    #
-    #     if test_api:
-    #         data = data[:1]
-    #
-    #     for subcategory in data:
-    #         children = subcategory.get('children')
-    #
-    #         if not children:
-    #             self.catalog.logger.warning(
-    #                 f'No children in data catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-    #             continue
-    #
-    #         if test_api:
-    #             children = children[:1]
-    #
-    #         for child_data in children:
-    #             child_id = child_data.get('id')
-    #             child_name = child_data.get(self.catalog.name_label_category)
-    #
-    #             kwargs_dict = {
-    #                 'child_id': child_id,
-    #                 'child_name': child_name,
-    #                 'data': child_data,
-    #             }
-    #
-    #             if hasattr(self, 'root_id'):
-    #                 kwargs_dict['root_id'] = self.root_id
-    #             else:
-    #                 kwargs_dict['root_id'] = self.id
-    #
-    #             self.add_children(**kwargs_dict)
-    #     return self.children
 
     @abstractmethod
     def validate(self, data: dict):
@@ -341,50 +295,7 @@ class KroneCategory(Category):
         pass
 
     def get_children(self, test_api, part_list=None):
-        response = self.catalog.get_category(category_id=self.id)
-
-        if response.status_code != 200:
-            self.catalog.logger.warning(
-                f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-            return False
-
-        data = response.json().get('data')
-
-        if not data:
-            self.catalog.logger.warning(
-                f'Note data in catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-            return False
-
-        if part_list:
-            children = data
-        else:
-            children = data[0].get('children')
-
-        if not children:
-            self.catalog.logger.warning(
-                f'No children in data catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-            return False
-
-        if test_api:
-            children = children[:1]
-
-        for child_data in children:
-            child_id = child_data.get('id')
-            child_name = child_data.get(self.catalog.name_label_category)
-
-            kwargs_dict = {
-                'child_id': child_id,
-                'child_name': child_name,
-                'data': child_data,
-            }
-
-            if hasattr(self, 'root_id'):
-                kwargs_dict['root_id'] = self.root_id
-            else:
-                kwargs_dict['root_id'] = self.id
-
-            self.add_children(**kwargs_dict)
-        return self.children
+        return super().get_children(test_api, part_list)
 
     def get_parts(self, test_api):
         return super().get_parts(test_api)
@@ -424,54 +335,7 @@ class JdeereCategory(Category):
         return super().get_parts(test_api)
 
     def get_children(self, test_api, part_list=None):
-        response = self.catalog.get_category(category_id=self.id)
-
-        if response.status_code != 200:
-            self.catalog.logger.warning(
-                f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-            return False
-
-        data = response.json().get('data')
-
-        if not data:
-            self.catalog.logger.warning(
-                f'Note data in catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-            return False
-
-        if test_api:
-            data = data[:1]
-
-        for subcategory in data:
-            if part_list:
-                children = data
-            else:
-                children = subcategory.get('children')
-
-            if not children:
-                self.catalog.logger.warning(
-                    f'No children in data catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-                continue
-
-            if test_api:
-                children = children[:1]
-
-            for child_data in children:
-                child_id = child_data.get('id')
-                child_name = child_data.get(self.catalog.name_label_category)
-
-                kwargs_dict = {
-                    'child_id': child_id,
-                    'child_name': child_name,
-                    'data': child_data,
-                }
-
-                if hasattr(self, 'root_id'):
-                    kwargs_dict['root_id'] = self.root_id
-                else:
-                    kwargs_dict['root_id'] = self.id
-
-                self.add_children(**kwargs_dict)
-        return self.children
+        return super().get_children(test_api, part_list)
 
 
 class ClaasCategory(Category):

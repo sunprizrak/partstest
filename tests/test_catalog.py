@@ -22,7 +22,6 @@ class CatalogTestUtility:
         )
         for category in categories:
             bar.message = f"{bar_message} from {category}"
-            bar.next()
             resp = category.get_children(test_api, part_list)
 
             if resp:
@@ -31,6 +30,7 @@ class CatalogTestUtility:
 
                 children.extend(resp)
 
+            bar.next()
         bar.finish()
         return children
 
@@ -76,10 +76,10 @@ class TestCatalogBase(ABC, CatalogTestUtility):
                 catalog.logger.warning(f'No PARTS in {catalog.name} category_name: {category.name} category_id: {category.id})')
 
         if parts:
-            bar = IncrementalBar(f'validate details in {catalog.name}', max=len(parts), suffix='%(index)d/%(max)d ')
+            bar_message = 'validate detail'
+            bar = IncrementalBar(message=bar_message, max=len(parts), suffix='%(index)d/%(max)d ')
             for part in parts:
-                bar.next()
-
+                bar.message = f"{bar_message} {part}"
                 if test_api:
                     time.sleep(0.2)
 
@@ -87,20 +87,17 @@ class TestCatalogBase(ABC, CatalogTestUtility):
 
                 if response.status_code != 200:
                     catalog.logger.warning(
-                        f'Bad request catalog: {catalog.name} part_id: {part.id} {catalog.current_url}')
+                        f'Bad request catalog: {catalog.name} {part} {catalog.current_url}')
                     continue
 
                 data = response.json().get('data')
-                # for test
-                print('\n')
-                for key, val in data.items():
-                    print(f"{key}: {val}")
-                # end test
+
                 if not data:
-                    catalog.logger.warning(f'No data in {catalog.name} Part_id: {part.id})')
+                    catalog.logger.warning(f'No data in {catalog.name} {part})')
                     continue
 
                 part.validate(data=data)
+                bar.next()
             bar.finish()
         else:
             catalog.logger.warning(f'No parts in catalog: {catalog.name}')

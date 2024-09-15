@@ -9,15 +9,6 @@ from colorama import Fore, init
 # Инициализация colorama
 init(autoreset=True)
 
-'''
-name = inquirer.text(message="What's your name:").execute()
-fav_lang = inquirer.select(
-    message="What's your favourite programming language:",
-    choices=["Go", "Python", "Rust", "JavaScript"],
-).execute()
-confirm = inquirer.confirm(message="Confirm?").execute()
-'''
-
 
 def update_spinner(spin, spin_event):
     while not spin_event.is_set():
@@ -55,8 +46,6 @@ class Level:
 level = Level()
 
 
-
-
 def start_app():
     print(Fore.GREEN + 'App for testing API https://detalum.ru/')
     choice = inquirer.select(
@@ -92,6 +81,7 @@ def start_app():
 
         if brands:
             level + 1
+            brands['Тест API для всех каталогов'] = f"-s -v tests/test_catalog.py::TestCatalog::test_root_categories tests/test_catalog.py::TestCatalog::test_tree tests/test_catalog.py::TestCatalog::test_parts --catalogs={','.join(brands.values())} --test_api"
             level.add_menu(brands)
             open_menu()
         else:
@@ -145,9 +135,6 @@ def open_menu(**kwargs):
         level + 1
         level.add_menu(catalog_menu)
         open_menu(brand=choice)
-
-
-
 
 
 if __name__ == '__main__':
