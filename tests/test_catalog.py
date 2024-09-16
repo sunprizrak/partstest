@@ -40,7 +40,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
     def test_root_categories(self, catalog, test_api):
         data = catalog.get_data_root_categories()
         if data:
-            bar = IncrementalBar(f'receive categories from {catalog.name} ', max=len(data), suffix='%(index)d/%(max)d ')
+            bar = IncrementalBar(f'receive categories from {catalog} ', max=len(data), suffix='%(index)d/%(max)d ')
             for category_data in data:
                 bar.next()
 
@@ -53,7 +53,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
                 category.validate(data=category_data)
             bar.finish()
         else:
-            catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog.name}')
+            catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog}')
 
     @abstractmethod
     def test_tree(self, catalog, test_api):
@@ -65,7 +65,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
             if category.part_lists:
                 category.get_parts(test_api)
             else:
-                catalog.logger.warning(f'No PARTLISTS in {catalog.name} category_name: {category.name} category_id: {category.id})')
+                catalog.logger.warning(f'No PARTLISTS in {catalog}/{category}')
 
         parts = []
 
@@ -73,7 +73,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
             if category.parts:
                 parts.extend(category.parts)
             else:
-                catalog.logger.warning(f'No PARTS in {catalog.name} category_name: {category.name} category_id: {category.id})')
+                catalog.logger.warning(f'No PARTS in {catalog}/{category}')
 
         if parts:
             bar_message = 'validate detail'
@@ -87,20 +87,20 @@ class TestCatalogBase(ABC, CatalogTestUtility):
 
                 if response.status_code != 200:
                     catalog.logger.warning(
-                        f'Bad request catalog: {catalog.name} {part} {catalog.current_url}')
+                        f'Bad request {catalog.current_url} {catalog}/{part}')
                     continue
 
                 data = response.json().get('data')
 
                 if not data:
-                    catalog.logger.warning(f'No data in {catalog.name} {part})')
+                    catalog.logger.warning(f'No data in {catalog}/{part})')
                     continue
 
                 part.validate(data=data)
                 bar.next()
             bar.finish()
         else:
-            catalog.logger.warning(f'No parts in catalog: {catalog.name}')
+            catalog.logger.warning(f'No parts in {catalog}')
 
 
 class TestLemkenCatalog(TestCatalogBase):
@@ -139,7 +139,7 @@ class TestLemkenCatalog(TestCatalogBase):
                 if index >= len(catalog.categories):
                     state_while = False
         else:
-            catalog.logger.warning(f'No Categories in {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog}')
 
 
 class TestGrimmeCatalog(TestCatalogBase):
@@ -188,7 +188,7 @@ class TestGrimmeCatalog(TestCatalogBase):
                 if index >= len(catalog.categories):
                     state_while = False
         else:
-            catalog.logger.warning(f'No Categories in {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog}')
 
 
 class TestKubotaCatalog(TestCatalogBase):
@@ -227,7 +227,7 @@ class TestKubotaCatalog(TestCatalogBase):
                 if index >= len(catalog.categories):
                     state_while = False
         else:
-            catalog.logger.warning(f'No Categories in {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog}')
 
 
 class TestClaasCatalog(TestCatalogBase):
@@ -271,7 +271,7 @@ class TestClaasCatalog(TestCatalogBase):
                 if index >= len(catalog.categories):
                     state_while = False
         else:
-            catalog.logger.warning(f'No Categories in {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog}')
 
 
 class TestKroneCatalog(TestCatalogBase):
@@ -315,7 +315,7 @@ class TestKroneCatalog(TestCatalogBase):
                 if index >= len(catalog.categories):
                     state_while = False
         else:
-            catalog.logger.warning(f'No Categories in {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog}')
 
 
 class TestKvernelandCatalog(TestCatalogBase):
@@ -354,7 +354,7 @@ class TestKvernelandCatalog(TestCatalogBase):
                 if index >= len(catalog.categories):
                     state_while = False
         else:
-            catalog.logger.warning(f'No Categories in {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog}')
 
 
 class TestRopaCatalog(TestCatalogBase):
@@ -393,7 +393,7 @@ class TestRopaCatalog(TestCatalogBase):
                 if index >= len(catalog.categories):
                     state_while = False
         else:
-            catalog.logger.warning(f'No Categories in {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog}')
 
 
 class TestJdeereCatalog(TestCatalogBase):
@@ -437,7 +437,7 @@ class TestJdeereCatalog(TestCatalogBase):
                 if index >= len(catalog.categories):
                     state_while = False
         else:
-            catalog.logger.warning(f'No Categories in {catalog.name}')
+            catalog.logger.warning(f'No Categories in {catalog}')
 
 
 class TestCatalog:
