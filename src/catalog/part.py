@@ -10,10 +10,34 @@ class Part(ABC):
         self.name = kwargs.get('name')
         self.validation_fields = set()
         self.validation_image_fields = set()
+        self.validation_category_fields = set()
 
     @abstractmethod
     def validate(self, data: dict):
-        pass
+        image_fields = data.get('imageFields')
+        part_category = data.get('category')
+
+        missing_fields = self.validation_fields - data.keys()
+
+        if len(missing_fields) > 0:
+            self.catalog.logger.warning(
+                f"Missing fields {missing_fields} in {self.catalog}/{self.category}/{self}")
+
+        if image_fields:
+            missing_fields = self.validation_image_fields - image_fields.keys()
+
+            if len(missing_fields) > 0:
+                self.catalog.logger.warning(
+                    f"Missing fields  {missing_fields} in imageFields => {self.catalog}/{self.category}/{self}")
+
+        if part_category:
+            missing_fields = self.validation_category_fields - part_category.keys()
+
+            if len(missing_fields) > 0:
+                self.catalog.logger.warning(
+                    f'Missing fields {missing_fields} in {self.catalog}/{self.category}/{self}')
+        else:
+            self.catalog.logger.warning(f'No part_category in {self.catalog}/{self.category}/{self}')
 
     def __str__(self):
         return f"{self.name} id:{self.id}"
@@ -35,29 +59,7 @@ class LemkenPart(Part):
         self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-        part_category = data.get('category')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if part_category:
-            missing_fields = self.validation_category_fields - part_category.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(f'Missing fields {missing_fields} in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
-        else:
-            self.catalog.logger.warning(f'No part_category in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
+        super().validate(data=data)
 
 
 class KubotaPart(Part):
@@ -72,29 +74,7 @@ class KubotaPart(Part):
         self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-        part_category = data.get('category')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if part_category:
-            missing_fields = self.validation_category_fields - part_category.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(f'Missing fields {missing_fields} in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
-        else:
-            self.catalog.logger.warning(f'No part_category in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
+        super().validate(data=data)
 
 
 class ClaasPart(Part):
@@ -109,31 +89,7 @@ class ClaasPart(Part):
         self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-        part_category = data.get('category')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if part_category:
-            missing_fields = self.validation_category_fields - part_category.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f'Missing fields {missing_fields} in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
-        else:
-            self.catalog.logger.warning(
-                f'No part_category in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
+        super().validate(data=data)
 
 
 class RopaPart(Part):
@@ -149,31 +105,7 @@ class RopaPart(Part):
         self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-        part_category = data.get('category')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if part_category:
-            missing_fields = self.validation_category_fields - part_category.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f'Missing fields {missing_fields} in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
-        else:
-            self.catalog.logger.warning(
-                f'No part_category in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
+        super().validate(data=data)
 
 
 class GrimmePart(Part):
@@ -189,31 +121,7 @@ class GrimmePart(Part):
         self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-        part_category = data.get('category')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if part_category:
-            missing_fields = self.validation_category_fields - part_category.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f'Missing fields {missing_fields} in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
-        else:
-            self.catalog.logger.warning(
-                f'No part_category in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
+        super().validate(data=data)
 
 
 class KronePart(Part):
@@ -228,31 +136,7 @@ class KronePart(Part):
         self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-        part_category = data.get('category')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if part_category:
-            missing_fields = self.validation_category_fields - part_category.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f'Missing fields {missing_fields} in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
-        else:
-            self.catalog.logger.warning(
-                f'No part_category in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
+        super().validate(data=data)
 
 
 class KvernelandPart(Part):
@@ -267,31 +151,7 @@ class KvernelandPart(Part):
         self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-        part_category = data.get('category')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if part_category:
-            missing_fields = self.validation_category_fields - part_category.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f'Missing fields {missing_fields} in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
-        else:
-            self.catalog.logger.warning(
-                f'No part_category in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
+        super().validate(data=data)
 
 
 class JdeerePart(Part):
@@ -306,31 +166,7 @@ class JdeerePart(Part):
         self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-        part_category = data.get('category')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.category.id} part_id: {self.id}")
-
-        if part_category:
-            missing_fields = self.validation_category_fields - part_category.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f'Missing fields {missing_fields} in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
-        else:
-            self.catalog.logger.warning(
-                f'No part_category in {self.catalog.name} category_id: {self.category.id} part_id: {self.id}')
+        super().validate(data=data)
 
 
 def create_part_instance(catalog, category, part_id, name):

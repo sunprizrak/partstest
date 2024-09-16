@@ -109,8 +109,11 @@ class Catalog(ABC):
         resp = self._make_request(url=url)
         return resp
 
+    def __str__(self):
+        return f"{self.name}"
+
     def __repr__(self):
-        return self.name
+        return f"{self.name}"
 
 
 class LemkenCatalog(Catalog):
