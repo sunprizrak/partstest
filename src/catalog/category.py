@@ -36,7 +36,7 @@ class Category(ABC):
 
     @abstractmethod
     def get_parts(self, test_api):
-        bar = IncrementalBar(f'receive PARTS from PARTLISTS {self.name} ', max=len(self.part_lists), suffix='%(index)d/%(max)d ')
+        bar = IncrementalBar(f'receive PARTS from PARTLISTS {self} ', max=len(self.part_lists), suffix='%(index)d/%(max)d ')
         for part_list in self.part_lists:
             if test_api:
                 time.sleep(0.2)
@@ -45,14 +45,14 @@ class Category(ABC):
 
             if response.status_code != 200:
                 self.catalog.logger.warning(
-                    f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id} part_list_id: {part_list.id} ')
+                    f'Bad request {self.catalog.current_url} {self.catalog}/{self}/{part_list} ')
                 continue
 
             data = response.json().get('data')
 
             if not data:
                 self.catalog.logger.warning(
-                    f'No Parts in {self.catalog.name} category_name: {self.name} category_id: {self.id} part_list_id: {part_list.id}')
+                    f'No Parts in {self.catalog}/{self}/{part_list}')
                 continue
 
             if test_api:
@@ -71,14 +71,14 @@ class Category(ABC):
 
         if response.status_code != 200:
             self.catalog.logger.warning(
-                f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+                f'Bad request {self.catalog.current_url} {self.catalog}/{self}')
             return False
 
         data = response.json().get('data')
 
         if not data:
             self.catalog.logger.warning(
-                f'Note data in catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+                f'Note data in {self.catalog}/{self}')
             return False
 
         if test_api:
@@ -92,7 +92,7 @@ class Category(ABC):
 
             if not children:
                 self.catalog.logger.warning(
-                    f'No children in data catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
+                    f'No children in data {self.catalog}/{self}')
                 continue
 
             if test_api:
@@ -118,7 +118,20 @@ class Category(ABC):
 
     @abstractmethod
     def validate(self, data: dict):
-        pass
+        image_fields = data.get('imageFields')
+
+        missing_fields = self.validation_fields - data.keys()
+
+        if len(missing_fields) > 0:
+            self.catalog.logger.warning(
+                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
+
+        if image_fields:
+            missing_fields = self.validation_image_fields - image_fields.keys()
+
+            if len(missing_fields) > 0:
+                self.catalog.logger.warning(
+                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
 
     def __str__(self):
         return f"{self.name} id:{self.id}"
@@ -139,20 +152,7 @@ class LemkenCategory(Category):
         self.validation_image_fields = {'name', 's3'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
+        return super().validate(data=data)
 
     def get_children(self, test_api, part_list=None):
         return super().get_children(test_api, part_list)
@@ -173,20 +173,7 @@ class KubotaCategory(Category):
         self.validation_image_fields = {'name', 's3'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
+        return super().validate(data=data)
 
     def get_children(self, test_api, part_list=None):
         return super().get_children(test_api, part_list)
@@ -276,11 +263,7 @@ class GrimmeCategory(Category):
         bar.finish()
 
     def validate(self, data: dict):
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
+        return super().validate(data=data)
 
 
 class KroneCategory(Category):
@@ -293,7 +276,7 @@ class KroneCategory(Category):
         }
 
     def validate(self, data: dict):
-        pass
+        return super().validate(data=data)
 
     def get_children(self, test_api, part_list=None):
         return super().get_children(test_api, part_list)
@@ -311,7 +294,7 @@ class KvernelandCategory(Category):
         }
 
     def validate(self, data: dict):
-        pass
+        return super().validate(data=data)
 
     def get_parts(self, test_api):
         return super().get_parts(test_api)
@@ -330,7 +313,7 @@ class JdeereCategory(Category):
         }
 
     def validate(self, data: dict):
-        pass
+        return super().validate(data=data)
 
     def get_parts(self, test_api):
         return super().get_parts(test_api)
@@ -351,20 +334,7 @@ class ClaasCategory(Category):
         self.validation_image_fields = {'name', 's3'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
+        return super().validate(data=data)
 
     def get_children(self, test_api, part_list=None):
         return super().get_children(test_api, part_list)
@@ -384,20 +354,7 @@ class RopaCategory(Category):
         self.validation_image_fields = {'name', 's3'}
 
     def validate(self, data: dict):
-        image_fields = data.get('imageFields')
-
-        missing_fields = self.validation_fields - data.keys()
-
-        if len(missing_fields) > 0:
-            self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
-
-        if image_fields:
-            missing_fields = self.validation_image_fields - image_fields.keys()
-
-            if len(missing_fields) > 0:
-                self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
+        return super().validate(data=data)
 
     def get_children(self, test_api, part_list=None):
         return super().get_children(test_api, part_list)
