@@ -124,14 +124,14 @@ class Category(ABC):
 
         if len(missing_fields) > 0:
             self.catalog.logger.warning(
-                f"Missing fields {missing_fields} in catalog: {self.catalog.name} category_id: {self.id}")
+                f"Missing fields {missing_fields} in {self.catalog}/{self}")
 
         if image_fields:
             missing_fields = self.validation_image_fields - image_fields.keys()
 
             if len(missing_fields) > 0:
                 self.catalog.logger.warning(
-                    f"Missing fields  {missing_fields} in imageFields => in catalog: {self.catalog.name} category_id: {self.id}")
+                    f"Missing fields  {missing_fields} in imageFields => in {self.catalog}/{self}")
 
     def __str__(self):
         return f"{self.name} id:{self.id}"
