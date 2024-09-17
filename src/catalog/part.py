@@ -98,8 +98,8 @@ class RopaPart(Part):
         super(RopaPart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
-            'part_number', 'position', 'dimension',
-            'imageFields', 'created_at', 'updated_at',
+            'part_number', 'position', 'imageFields',
+            'created_at', 'updated_at',
         }
         self.validation_image_fields = {'name', 's3'}
         self.validation_category_fields = {'id'}
@@ -114,11 +114,9 @@ class GrimmePart(Part):
         super(GrimmePart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
-            'part_number', 'position', 'dimension',
-            'imageFields', 'created_at', 'updated_at',
+            'partNumber', 'position', 'created_at',
+            'updated_at',
         }
-        self.validation_image_fields = {'name', 's3'}
-        self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):
         super().validate(data=data)
@@ -159,10 +157,9 @@ class JdeerePart(Part):
         super(JdeerePart, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'link_type', 'quantity',
-            'part_number', 'position', 'dimension',
-            'imageFields', 'created_at', 'updated_at',
+            'part_number', 'position', 's3_image_name',
+            'created_at', 'updated_at',
         }
-        self.validation_image_fields = {'name', 's3'}
         self.validation_category_fields = {'id'}
 
     def validate(self, data: dict):

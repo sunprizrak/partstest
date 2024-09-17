@@ -271,9 +271,11 @@ class KroneCategory(Category):
     def __init__(self, *args, **kwargs):
         super(KroneCategory, self).__init__(*args, **kwargs)
         self.validation_fields = {
-            'id', 'label', 'parent_id', 'linkType',
-            'children', 'created_at', 'updated_at',
+            'id', 'name', 'parent_id', 'link_type', 'children',
+            'created_at', 'updated_at', 'position', 'description',
+            'remark', 'imageFields',
         }
+        self.validation_image_fields = {'name', 's3'}
 
     def validate(self, data: dict):
         return super().validate(data=data)
@@ -289,9 +291,11 @@ class KvernelandCategory(Category):
     def __init__(self, *args, **kwargs):
         super(KvernelandCategory, self).__init__(*args, **kwargs)
         self.validation_fields = {
-            'id', 'label', 'parent_id', 'linkType',
-            'children', 'created_at', 'updated_at',
+            'id', 'name', 'parent_id', 'link_type', 'children',
+            'created_at', 'updated_at', 'position', 'description',
+            'remark', 'imageFields',
         }
+        self.validation_image_fields = {'name', 's3'}
 
     def validate(self, data: dict):
         return super().validate(data=data)
@@ -308,9 +312,11 @@ class JdeereCategory(Category):
     def __init__(self, *args, **kwargs):
         super(JdeereCategory, self).__init__(*args, **kwargs)
         self.validation_fields = {
-            'id', 'label', 'parent_id', 'linkType',
-            'children', 'created_at', 'updated_at',
+            'id', 'name', 'parent_id', 'link_type', 'children',
+            'created_at', 'updated_at', 'position', 'description',
+            'remark', 'imageFields',
         }
+        self.validation_image_fields = {'name', 's3'}
 
     def validate(self, data: dict):
         return super().validate(data=data)
@@ -348,8 +354,7 @@ class RopaCategory(Category):
         super(RopaCategory, self).__init__(*args, **kwargs)
         self.validation_fields = {
             'id', 'name', 'parent_id', 'link_type', 'children',
-            'created_at', 'updated_at', 'position', 'description',
-            'remark', 'imageFields',
+            'created_at', 'updated_at', 'description', 'imageFields',
         }
         self.validation_image_fields = {'name', 's3'}
 
