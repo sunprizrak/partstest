@@ -136,7 +136,7 @@ class TestLemkenCatalog(TestCatalogBase):
                 else:
                     index += 1
 
-                if index >= len(catalog.categories):
+                if index == len(catalog.categories):
                     state_while = False
         else:
             catalog.logger.warning(f'No Categories in {catalog}')
