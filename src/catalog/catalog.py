@@ -3,7 +3,7 @@ import os
 import logging
 from datetime import datetime
 from abc import ABC, abstractmethod
-from src.catalog.category import create_category_instance, LemkenCategory
+from src.catalog.category import create_category_instance
 import time
 
 
@@ -42,7 +42,7 @@ class Catalog(ABC):
         if not os.path.exists(logs_dir):
             os.makedirs(logs_dir)
 
-        log_file = os.path.join(logs_dir, f"{self.name}_{datetime.now().strftime("%Y-%m-%d")}.log")
+        log_file = os.path.join(logs_dir, f"{self.name}_{datetime.now().strftime('%Y-%m-%d')}.log")
 
         if os.path.exists(log_file):
             os.remove(log_file)
