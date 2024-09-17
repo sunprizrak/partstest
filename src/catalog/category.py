@@ -28,7 +28,10 @@ class Category(ABC):
         return child
 
     def add_part_lists(self, part_list):
-        self.part_lists.append(part_list)
+        if isinstance(part_list, list):
+            self.part_lists.extend(part_list)
+        else:
+            self.part_lists.append(part_list)
 
     def add_part(self, part_id, name):
         part = create_part_instance(catalog=self.catalog, category=self, part_id=part_id, name=name)
