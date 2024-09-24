@@ -1,8 +1,6 @@
 import time
 from abc import ABC, abstractmethod
-
-from progress.bar import IncrementalBar
-
+from tqdm import tqdm
 from src.catalog.part import create_part_instance
 
 
@@ -39,34 +37,40 @@ class Category(ABC):
 
     @abstractmethod
     def get_parts(self, test_api):
-        bar = IncrementalBar(f'receive PARTS from PARTLISTS {self} ', max=len(self.part_lists), suffix='%(index)d/%(max)d ')
-        for part_list in self.part_lists:
-            if test_api:
-                time.sleep(0.2)
+        with tqdm(
+                total=len(self.part_lists),
+                bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
+                postfix='') as t:
+            for i, part_list in enumerate(self.part_lists, 1):
+                if i == len(self.part_lists):
+                    t.set_postfix_str('Details received')
+                else:
+                    t.set_postfix_str(f"Receive details from {part_list}")
+                t.update()
+                response = self.catalog.get_parts(child_id=part_list.id)
 
-            response = self.catalog.get_parts(child_id=part_list.id)
+                if response.status_code != 200:
+                    self.catalog.logger.warning(
+                        f'Bad request {self.catalog.current_url} {self.catalog}/{self}/{part_list} ')
+                    continue
 
-            if response.status_code != 200:
-                self.catalog.logger.warning(
-                    f'Bad request {self.catalog.current_url} {self.catalog}/{self}/{part_list} ')
-                continue
+                data = response.json().get('data')
 
-            data = response.json().get('data')
+                if not data:
+                    self.catalog.logger.warning(
+                        f'No details in {self.catalog}/{self}/{part_list}')
+                    continue
 
-            if not data:
-                self.catalog.logger.warning(
-                    f'No Parts in {self.catalog}/{self}/{part_list}')
-                continue
+                if test_api:
+                    data = data[:1]
 
-            if test_api:
-                data = data[:1]
+                for part in data:
+                    part_id = part.get('id')
+                    part_name = part.get(self.name_label_part)
+                    self.add_part(part_id=part_id, name=part_name)
 
-            for part in data:
-                part_id = part.get('id')
-                part_name = part.get(self.name_label_part)
-                self.add_part(part_id=part_id, name=part_name)
-            bar.next()
-        bar.finish()
+                if test_api:
+                    time.sleep(0.2)
 
     @abstractmethod
     def get_children(self, test_api, part_list):
@@ -231,39 +235,41 @@ class GrimmeCategory(Category):
         return self.children
 
     def get_parts(self, test_api):
-        bar = IncrementalBar(
-            messege=f'receive PARTS from PARTLISTS {self.name} ',
-            max=len(self.part_lists),
-            suffix='%(index)d/%(max)d ',
-        )
-        for part_list in self.part_lists:
-            bar.next()
+        with tqdm(
+                total=len(self.part_lists),
+                bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
+                postfix='') as t:
+            for i, part_list in enumerate(self.part_lists, 1):
+                if i == len(self.part_lists):
+                    t.set_postfix_str('Details received')
+                else:
+                    t.set_postfix_str(f"Receive details from {part_list}")
+                t.update()
 
-            if test_api:
-                time.sleep(0.2)
+                response = self.catalog.get_category(category_id=part_list.id)
 
-            response = self.catalog.get_category(category_id=part_list.id)
+                if response.status_code != 200:
+                    self.catalog.logger.warning(
+                        f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id} part_list_id: {part_list.id} ')
+                    continue
 
-            if response.status_code != 200:
-                self.catalog.logger.warning(
-                    f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id} part_list_id: {part_list.id} ')
-                continue
+                data = response.json().get('data')
 
-            data = response.json().get('data')
+                if not data:
+                    self.catalog.logger.warning(
+                        f'No Parts in {self.catalog.name} category_name: {self.name} category_id: {self.id} part_list_id: {part_list.id}')
+                    continue
 
-            if not data:
-                self.catalog.logger.warning(
-                    f'No Parts in {self.catalog.name} category_name: {self.name} category_id: {self.id} part_list_id: {part_list.id}')
-                continue
+                if test_api:
+                    data = data[:1]
 
-            if test_api:
-                data = data[:1]
+                for part in data:
+                    part_id = part.get('id')
+                    part_name = part.get(self.name_label_part)
+                    self.add_part(part_id=part_id, name=part_name)
 
-            for part in data:
-                part_id = part.get('id')
-                part_name = part.get(self.name_label_part)
-                self.add_part(part_id=part_id, name=part_name)
-        bar.finish()
+                if test_api:
+                    time.sleep(0.2)
 
     def validate(self, data: dict):
         return super().validate(data=data)

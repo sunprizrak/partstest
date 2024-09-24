@@ -1,6 +1,6 @@
 import time
 from abc import ABC, abstractmethod
-from progress.bar import IncrementalBar
+from tqdm import tqdm
 
 
 class NoDataException(Exception):
@@ -14,24 +14,23 @@ class CatalogTestUtility:
     @staticmethod
     def get_children(categories: list, test_api, part_list=None):
         children = []
-        bar_message = "receive children"
-        bar = IncrementalBar(
-            message=bar_message,
-            max=len(categories),
-            suffix='%(index)d/%(max)d ',
-        )
-        for category in categories:
-            bar.message = f"{bar_message} from {category}"
-            resp = category.get_children(test_api, part_list)
+        with tqdm(
+                total=len(categories),
+                bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
+                postfix='') as t:
+            for i, category in enumerate(categories, 1):
+                if i == len(categories):
+                    t.set_postfix_str(f"Children received")
+                else:
+                    t.set_postfix_str(f"Receive children from {category}")
+                t.update()
+                resp = category.get_children(test_api, part_list)
 
-            if resp:
-                if test_api:
-                    resp = resp[:1]
+                if resp:
+                    if test_api:
+                        resp = resp[:1]
 
-                children.extend(resp)
-
-            bar.next()
-        bar.finish()
+                    children.extend(resp)
         return children
 
 
@@ -40,18 +39,25 @@ class TestCatalogBase(ABC, CatalogTestUtility):
     def test_root_categories(self, catalog, test_api):
         data = catalog.get_data_root_categories()
         if data:
-            bar = IncrementalBar(f'receive categories from {catalog} ', max=len(data), suffix='%(index)d/%(max)d ')
-            for category_data in data:
-                bar.next()
+            with tqdm(
+                    total=len(data),
+                    bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
+                    postfix=f'Receive categories from {catalog}') as t:
+                for i, category_data in enumerate(data, 1):
+                    category = catalog.add_category(data=category_data)
+                    if i == len(data):
+                        t.set_postfix_str(f"Categories from {catalog} received and validated")
+                    else:
+                        t.set_postfix_str(f'Receive {category} from {catalog}')
+                    t.update()
 
-                if test_api:
-                    time.sleep(0.2)
-                else:
-                    time.sleep(0.1)
+                    category.validate(data=category_data)
 
-                category = catalog.add_category(data=category_data)
-                category.validate(data=category_data)
-            bar.finish()
+                    if test_api:
+                        time.sleep(0.2)
+                    else:
+                        time.sleep(0.1)
+
         else:
             catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog}')
 
@@ -76,31 +82,36 @@ class TestCatalogBase(ABC, CatalogTestUtility):
                 catalog.logger.warning(f'No PARTS in {catalog}/{category}')
 
         if parts:
-            bar_message = 'validate detail'
-            bar = IncrementalBar(message=bar_message, max=len(parts), suffix='%(index)d/%(max)d ')
-            for part in parts:
-                bar.message = f"{bar_message} {part}"
-                if test_api:
-                    time.sleep(0.2)
+            with tqdm(
+                    total=len(parts),
+                    bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
+                    postfix='') as t:
+                for i, part in enumerate(parts, 1):
+                    if i == len(parts):
+                        t.set_postfix_str('Details validated')
+                    t.set_postfix_str(f"Validate detail {part}")
 
-                response = catalog.get_part(part_id=part.id)
+                    t.update()
 
-                if response.status_code != 200:
-                    catalog.logger.warning(
-                        f'Bad request {catalog.current_url} {catalog}/{part}')
-                    continue
+                    if test_api:
+                        time.sleep(0.2)
 
-                data = response.json().get('data')
+                    response = catalog.get_part(part_id=part.id)
 
-                if not data:
-                    catalog.logger.warning(f'No data in {catalog}/{part})')
-                    continue
+                    if response.status_code != 200:
+                        catalog.logger.warning(
+                            f'Bad request {catalog.current_url} {catalog}/{part}')
+                        continue
 
-                part.validate(data=data)
-                bar.next()
-            bar.finish()
+                    data = response.json().get('data')
+
+                    if not data:
+                        catalog.logger.warning(f'No data in {catalog}/{part})')
+                        continue
+
+                    part.validate(data=data)
         else:
-            catalog.logger.warning(f'No parts in {catalog}')
+            catalog.logger.warning(f'No details in {catalog}')
 
 
 class TestLemkenCatalog(TestCatalogBase):

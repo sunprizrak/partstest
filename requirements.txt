@@ -1,6 +1,6 @@
 pytest
 requests
-progress
 colorama
 InquirerPy
 allure-pytest
+tqdm
