@@ -82,6 +82,7 @@ def start_app():
 
         stop_spinner.set()
         spinner.set_description(Fore.CYAN + 'Brands loaded')
+        spinner.close()
         thread.join()
 
         if brands:

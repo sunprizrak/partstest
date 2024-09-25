@@ -41,11 +41,9 @@ class Category(ABC):
                 total=len(self.part_lists),
                 bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
                 postfix='') as t:
-            for i, part_list in enumerate(self.part_lists, 1):
-                if i == len(self.part_lists):
-                    t.set_postfix_str('Details received')
-                else:
-                    t.set_postfix_str(f"Receive details from {part_list}")
+            for part_list in self.part_lists:
+
+                t.set_postfix_str(f"Receive details from {part_list}")
                 t.update()
                 response = self.catalog.get_parts(child_id=part_list.id)
 
@@ -71,6 +69,7 @@ class Category(ABC):
 
                 if test_api:
                     time.sleep(0.2)
+            t.set_postfix_str('Details received')
 
     @abstractmethod
     def get_children(self, test_api, part_list):
@@ -239,11 +238,8 @@ class GrimmeCategory(Category):
                 total=len(self.part_lists),
                 bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
                 postfix='') as t:
-            for i, part_list in enumerate(self.part_lists, 1):
-                if i == len(self.part_lists):
-                    t.set_postfix_str('Details received')
-                else:
-                    t.set_postfix_str(f"Receive details from {part_list}")
+            for part_list in self.part_lists:
+                t.set_postfix_str(f"Receive details from {part_list}")
                 t.update()
 
                 response = self.catalog.get_category(category_id=part_list.id)
@@ -270,6 +266,7 @@ class GrimmeCategory(Category):
 
                 if test_api:
                     time.sleep(0.2)
+            t.set_postfix_str('Details received')
 
     def validate(self, data: dict):
         return super().validate(data=data)

@@ -16,13 +16,10 @@ class CatalogTestUtility:
         children = []
         with tqdm(
                 total=len(categories),
-                bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
-                postfix='') as t:
-            for i, category in enumerate(categories, 1):
-                if i == len(categories):
-                    t.set_postfix_str(f"Children received")
-                else:
-                    t.set_postfix_str(f"Receive children from {category}")
+                bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}"
+        ) as t:
+            for category in categories:
+                t.set_postfix_str(f"Receive children from {category}")
                 t.update()
                 resp = category.get_children(test_api, part_list)
 
@@ -31,6 +28,7 @@ class CatalogTestUtility:
                         resp = resp[:1]
 
                     children.extend(resp)
+            t.set_postfix_str('Children received')
         return children
 
 
@@ -42,13 +40,11 @@ class TestCatalogBase(ABC, CatalogTestUtility):
             with tqdm(
                     total=len(data),
                     bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
-                    postfix=f'Receive categories from {catalog}') as t:
-                for i, category_data in enumerate(data, 1):
+                    postfix=f'Receive categories from {catalog}',
+            ) as t:
+                for category_data in data:
                     category = catalog.add_category(data=category_data)
-                    if i == len(data):
-                        t.set_postfix_str(f"Categories from {catalog} received and validated")
-                    else:
-                        t.set_postfix_str(f'Receive {category} from {catalog}')
+                    t.set_postfix_str(f'Receive {category} from {catalog}')
                     t.update()
 
                     category.validate(data=category_data)
@@ -57,7 +53,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
                         time.sleep(0.2)
                     else:
                         time.sleep(0.1)
-
+                t.set_postfix_str(f"Categories from {catalog} received and validated")
         else:
             catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog}')
 
@@ -86,9 +82,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
                     total=len(parts),
                     bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
                     postfix='') as t:
-                for i, part in enumerate(parts, 1):
-                    if i == len(parts):
-                        t.set_postfix_str('Details validated')
+                for part in parts:
                     t.set_postfix_str(f"Validate detail {part}")
 
                     t.update()
@@ -110,6 +104,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
                         continue
 
                     part.validate(data=data)
+                t.set_postfix_str('Details validated')
         else:
             catalog.logger.warning(f'No details in {catalog}')
 
