@@ -3,16 +3,19 @@ import time
 import pytest
 import requests
 from InquirerPy import inquirer
-from progress.spinner import Spinner
 from colorama import Fore, init
+from tqdm import tqdm
+from itertools import cycle
 
 # Инициализация colorama
 init(autoreset=True)
 
 
-def update_spinner(spin, spin_event):
+def update_spinner(spin, spin_text, spin_event):
+    spinner_cycle = cycle(['-', '\\', '|', '/'])
     while not spin_event.is_set():
-        spin.next()
+        spin.set_description(f"{spin_text} {next(spinner_cycle)}")
+        spin.refresh()
         time.sleep(0.1)
 
 
@@ -56,10 +59,11 @@ def start_app():
     ).execute()
 
     if choice == 'continue':
-        spinner = Spinner(Fore.CYAN + 'Loading Brands ')
+        spinner_text = Fore.CYAN + 'Loading Brands'
+        spinner = tqdm(total=0, bar_format="{desc}", ncols=30)
         stop_spinner = threading.Event()
 
-        thread = threading.Thread(target=update_spinner, args=(spinner, stop_spinner))
+        thread = threading.Thread(target=update_spinner, args=(spinner, spinner_text, stop_spinner))
         thread.start()
 
         url = 'http://api.catalog.detalum.ru/api/v1/brand'
@@ -77,6 +81,7 @@ def start_app():
             print(Fore.RED + f'Bad request {url}')
 
         stop_spinner.set()
+        spinner.set_description(Fore.CYAN + 'Brands loaded')
         thread.join()
 
         if brands:
