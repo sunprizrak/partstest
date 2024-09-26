@@ -59,7 +59,7 @@ class Catalog(ABC):
         logger.addHandler(file_handler)
         return logger
 
-    def _make_request(self, url, retries=5, delay=2, timeout=10):
+    def _make_request(self, url, retries=100, delay=2, timeout=10):
         """
         Выполняет запрос с повторными попытками в случае таймаута.
         :param url: URL для запроса
