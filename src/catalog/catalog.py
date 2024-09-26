@@ -22,7 +22,7 @@ class Catalog(ABC):
     def add_category(self, data):
         category_id = data.get('id')
         name = data.get(self.name_label_category)
-        category = create_category_instance(catalog=self, category_id=category_id, name=name, data=data)
+        category = create_category_instance(catalog=self, category_id=category_id, name=name)
         self.categories[category_id] = category
         return category
 

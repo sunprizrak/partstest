@@ -9,7 +9,6 @@ class Category(ABC):
 
     def __init__(self, *args, **kwargs):
         self.catalog = kwargs.get('catalog')
-        self.data = kwargs.get('data')
         if kwargs.get('root_id'):
             self.root_id = kwargs.get('root_id')
         self.id = kwargs.get('category_id')
@@ -20,8 +19,8 @@ class Category(ABC):
         self.validation_fields = set()
         self.validation_image_fields = set()
 
-    def add_children(self, child_id, child_name, data, root_id):
-        child = create_category_instance(catalog=self.catalog, category_id=child_id, name=child_name, data=data, root_id=root_id)
+    def add_children(self, child_id, child_name, root_id):
+        child = create_category_instance(catalog=self.catalog, category_id=child_id, name=child_name, root_id=root_id)
         self.children.append(child)
         return child
 
@@ -111,7 +110,6 @@ class Category(ABC):
                 kwargs_dict = {
                     'child_id': child_id,
                     'child_name': child_name,
-                    'data': child_data,
                 }
 
                 if hasattr(self, 'root_id'):
@@ -222,7 +220,6 @@ class GrimmeCategory(Category):
             kwargs_dict = {
                 'child_id': child_id,
                 'child_name': child_name,
-                'data': child_data,
             }
 
             if hasattr(self, 'root_id'):
@@ -374,16 +371,16 @@ class RopaCategory(Category):
         return super().get_parts(test_api)
 
 
-def create_category_instance(catalog, category_id, name, data, root_id=None):
+def create_category_instance(catalog, category_id, name, root_id=None):
     cls = globals().get(f"{catalog.name.capitalize()}Category")
     cleaned_name = name.strip().replace('\n', '')
     if cls is None:
         raise ValueError(f"Class {catalog.name.capitalize()}Category is not defined.")
 
     if root_id:
-        return cls(catalog=catalog, category_id=category_id, name=cleaned_name, data=data, root_id=root_id)
+        return cls(catalog=catalog, category_id=category_id, name=cleaned_name, root_id=root_id)
     else:
-        return cls(catalog=catalog, category_id=category_id, name=cleaned_name, data=data)
+        return cls(catalog=catalog, category_id=category_id, name=cleaned_name)
 
 
 if __name__ == '__main__':
