@@ -1,10 +1,14 @@
-import requests
+import aiohttp
 import os
 import logging
 from datetime import datetime
 from abc import ABC, abstractmethod
+
+from aiohttp import ClientError, ClientTimeout
+
 from src.catalog.category import create_category_instance
-import time
+import asyncio
+from database import add_category as db_add_category
 
 
 class Catalog(ABC):
@@ -19,22 +23,14 @@ class Catalog(ABC):
         self.validation_image_fields = set()
         self.logger = self.__setup_logger()
 
-    def add_category(self, data):
+    async def add_category(self, data):
         category_id = data.get('id')
         name = data.get(self.name_label_category)
-        category = create_category_instance(catalog=self, category_id=category_id, name=name)
+        category = await create_category_instance(catalog=self, category_id=category_id, name=name)
+        await db_add_category(category_id=category_id, name=name)
         self.categories[category_id] = category
+
         return category
-
-    def get_data_root_categories(self):
-        response = self.get_tree()
-
-        if response.status_code == 200:
-            data = response.json().get('data')
-            return data
-        else:
-            self.logger.warning(f'Bad request {self.current_url} catalog: {self.name}')
-            return False
 
     def __setup_logger(self):
         logs_dir = os.path.join('logs', self.name)
@@ -59,54 +55,55 @@ class Catalog(ABC):
         logger.addHandler(file_handler)
         return logger
 
-    def _make_request(self, url, retries=100, delay=2, timeout=10):
+    async def _make_request(self, url, retries=10, delay=2, timeout=30):
         """
-        Выполняет запрос с повторными попытками в случае таймаута.
+        Выполняет асинхронный запрос с повторными попытками в случае таймаута.
         :param url: URL для запроса
         :param retries: Количество попыток
         :param delay: Задержка между попытками (в секундах)
         :param timeout: Время ожидания ответа от сервера
         :return: Ответ от сервера или None
         """
-        for attempt in range(1, retries + 1):
-            try:
-                response = requests.get(url, timeout=timeout)
-                response.raise_for_status()
-                return response
-            except requests.exceptions.ConnectTimeout:
-                self.logger.warning(f"Таймаут подключения {url}. Попытка {attempt} не удалась.")
-            except requests.exceptions.ReadTimeout:
-                self.logger.warning(f"Таймаут чтения данных {url}. Попытка {attempt} не удалась.")
-            except requests.exceptions.RequestException as e:
-                self.logger.warning(f"Ошибка: {e}")
-                break
-            if attempt < retries:
-                time.sleep(delay)
-        self.logger.warning(f"Все попытки исчерпаны. Запрос {url} не выполнен.")
-        return
+        attempt = 1
+        async with aiohttp.ClientSession() as session:
+            while attempt <= retries:
+                try:
+                    async with session.get(url, timeout=timeout) as response:
+                        response.raise_for_status()
+                        return await response.json()
+                except (ClientError, ClientTimeout) as error:
+                    self.logger.warning(f"{self.name} {url} Ошибка при попытке {attempt}/{retries}: {error}")
 
-    def get_tree(self):
+                    if attempt == retries:
+                        self.logger.error(f"{self.name} все попытки исчерпаны. Запрос {url} не выполнен.")
+                finally:
+                    if attempt < retries:
+                        await asyncio.sleep(delay)
+                    attempt += 1
+        return None
+
+    async def fetch_tree(self):
         url = f"{self.api_url}/{self.name}/catalog/tree"
         self.current_url = url
-        resp = self._make_request(url=url)
+        resp = await self._make_request(url=url)
         return resp
 
-    def get_category(self, category_id):
+    async def fetch_category(self, category_id):
         url = f"{self.api_url}/{self.name}/catalog/{category_id}"
         self.current_url = url
-        resp = self._make_request(url=url)
+        resp = await self._make_request(url=url)
         return resp
 
-    def get_parts(self, child_id):
-        url = f"{self.api_url}/{self.name}/catalog/{child_id}/parts"
+    async def fetch_parts(self, part_list_id):
+        url = f"{self.api_url}/{self.name}/catalog/{part_list_id}/parts"
         self.current_url = url
-        resp = self._make_request(url=url)
+        resp = await self._make_request(url=url)
         return resp
 
-    def get_part(self, part_id):
+    async def fetch_part(self, part_id):
         url = f"{self.api_url}/{self.name}/part/{part_id}"
         self.current_url = url
-        resp = self._make_request(url=url)
+        resp = await self._make_request(url=url)
         return resp
 
     def __str__(self):
@@ -117,7 +114,10 @@ class Catalog(ABC):
 
 
 class LemkenCatalog(Catalog):
-    pass
+
+    def __init__(self, name):
+        super(LemkenCatalog, self).__init__(name)
+        self.depth = 2
 
 
 class KubotaCatalog(Catalog):
@@ -160,14 +160,15 @@ def create_catalog_instance(catalog_name):
 
 if __name__ == '__main__':
     catalog = create_catalog_instance(catalog_name='lemken')
-    response = catalog.get_tree()
-    data = response.json().get('data')
-    print('---------Categories------------------------------------------')
-    print(f"колличество категорий: {len(data)}")
-    print(f'type data : {type(data)}')
-    print('---------category[0]-------------------------------------------')
-    for key, val in data[0].items():
-        print(f"{key}: {val}")
+    # response = asyncio.run(catalog.get_tree())
+    # print(response)
+    # data = response.get('data')
+    # print('---------Categories------------------------------------------')
+    # print(f"колличество категорий: {len(data)}")
+    # print(f'type data : {type(data)}')
+    # print('---------category[0]-------------------------------------------')
+    # for key, val in data[0].items():
+    #     print(f"{key}: {val}")
 
     # print('---------Subcategories-----------------')
     # response = catalog.get_category(category_id=657132)
@@ -195,14 +196,15 @@ if __name__ == '__main__':
     # for key, val in data[1].items():
     #     print(f"{key}: {val}")
     #
-    # print('---------Parts------------------')
-    # response = catalog.get_parts(child_id=23243)
-    # data = response.json().get('data')
-    # print(data)
-    # print(f"len data: {len(data)}")
-    # print('<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>..')
-    # for el in data:
-    #     print(el)
+    print('---------Parts------------------')
+    response = asyncio.run(catalog.fetch_parts(child_id=144236))
+    print(response)
+    data = response.get('data')
+    print(data)
+    print(f"len data: {len(data)}")
+    print('<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>..')
+    for el in data:
+        print(el)
 
 
 

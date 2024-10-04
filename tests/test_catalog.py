@@ -1,6 +1,17 @@
-import time
+import asyncio
 from abc import ABC, abstractmethod
-from tqdm import tqdm
+from random import randint
+import nest_asyncio
+from colorama import Fore
+from tqdm.asyncio import tqdm
+from src.catalog.category import create_category_instance
+from src.catalog.part import create_part_instance
+from tests.conftest import catalog
+from utility import update_spinner
+from database import add_parts_list, count_parts_list, count_parts, fetch_all_parts_lists, fetch_parts_lists_batch, \
+    fetch_parts, fetch_parts_batch
+
+nest_asyncio.apply()
 
 
 class NoDataException(Exception):
@@ -11,139 +22,208 @@ class NoDataException(Exception):
 
 class CatalogTestUtility:
 
-    @staticmethod
-    def get_children(categories: list, test_api, part_list=None):
-        children = []
-        with tqdm(
-                total=len(categories),
-                bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}"
-        ) as t:
-            for category in categories:
-                t.set_postfix_str(f"Receive children from {category}")
-                t.update()
-                resp = category.get_children(test_api, part_list)
+    async def process_children(self, category, test_api, t, depth=1, part_list=None, semaphore=None):
+        if semaphore is None:
+            semaphore = asyncio.Semaphore(10)
 
-                if resp:
-                    if test_api:
-                        resp = resp[:1]
+        if depth > category.catalog.depth:
+            return
 
-                    children.extend(resp)
-            t.set_postfix_str('Children received')
-        return children
+        async for child in category.fetch_children(test_api=test_api, part_list=part_list):
+            async with semaphore:
+                if child:
+                    t.set_postfix_str(f'{child} FROM {category}')
+                    t.update()
+                    t.total = t.n * randint(2, 3)
+                    has_children = True
+                    if depth == category.catalog.depth:
+                        await add_parts_list(
+                            root_id=child.root_id,
+                            parts_list_id=child.id,
+                            name=child.name,
+                        )
+                    await self.process_children(category=child, test_api=test_api, t=t, depth=depth+1)
+        return has_children if test_api else None
+
+    async def process_fetch_parts_from_parts_lists(self, category_id, count):
+        if 0 < count < 50:
+            parts_lists = await fetch_all_parts_lists(category_id=category_id)
+            yield parts_lists
+
+        elif count >= 50:
+            batch_size = 50
+
+            for offset in range(0, count, batch_size):
+                batch = await fetch_parts_lists_batch(category_id=category_id, batch_size=batch_size, offset=offset)
+                yield batch
+
+    async def process_validation_parts(self, category_id, count):
+        if 0 < count < 50:
+            parts = await fetch_parts(category_id=category_id)
+            yield parts
+        elif count >= 50:
+            batch_size = 50
+
+            for offset in range(0, count, batch_size):
+                batch = await fetch_parts_batch(category_id=category_id, batch_size=batch_size, offset=offset)
+                yield batch
 
 
 class TestCatalogBase(ABC, CatalogTestUtility):
 
-    def test_root_categories(self, catalog, test_api):
-        data = catalog.get_data_root_categories()
-        if data:
-            with tqdm(
+    async def test_root_categories(self, catalog, test_api):
+        spinner = tqdm(total=0, bar_format="{desc}", ncols=30)
+        spinner_text = Fore.CYAN + 'Receive categories data'
+        spinner_event = asyncio.Event()
+        spinner_task = asyncio.create_task(update_spinner(spin=spinner, spin_text=spinner_text, spin_event=spinner_event))
+
+        try:
+            resp_json = await catalog.fetch_tree()
+        finally:
+            spinner_event.set()
+            await spinner_task
+            spinner.set_description(Fore.CYAN + 'Loaded data categories')
+            spinner.close()
+
+        if resp_json:
+            data = resp_json.get('data')
+
+            if data:
+                t = tqdm(
                     total=len(data),
-                    bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
+                    desc='Process',
+                    bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt}/{total_fmt} | {postfix}",
                     postfix=f'Receive categories from {catalog}',
-            ) as t:
-                for category_data in data:
-                    category = catalog.add_category(data=category_data)
-                    t.set_postfix_str(f'Receive {category} from {catalog}')
-                    t.update()
+                )
 
-                    category.validate(data=category_data)
+                async def process_category(category_data):
+                    category = await catalog.add_category(data=category_data)
+                    t.set_postfix_str(f'{category} from {catalog}')
+                    await category.validate(data=category_data)
 
-                    if test_api:
-                        time.sleep(0.2)
-                    else:
-                        time.sleep(0.1)
-                t.set_postfix_str(f"Categories from {catalog} received and validated")
-        else:
-            catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog}')
+                tasks = (asyncio.create_task(process_category(category_data)) for category_data in data)
+                try:
+                    for task in asyncio.as_completed(tasks):
+                        await task
+                        t.update()
+                        await asyncio.sleep(0.1)
+                finally:
+                    t.set_postfix_str(f"Categories from {catalog} received and validated")
+                    t.close()
+            else:
+                catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog}')
 
     @abstractmethod
-    def test_tree(self, catalog, test_api):
+    async def test_tree(self, catalog, test_api):
         pass
 
-    def test_parts(self, catalog, test_api):
+    async def test_parts(self, catalog, test_api):
+        categories = list(catalog.categories.values())
 
-        for category in catalog.categories.values():
-            if category.part_lists:
-                category.get_parts(test_api)
-            else:
-                catalog.logger.warning(f'No PARTLISTS in {catalog}/{category}')
+        t = tqdm(
+            total=0,
+            desc='Process fetch parts',
+            bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
+        )
 
-        parts = []
+        async def _process_batch_fetch_parts(parts_list_data, obj_catalog, obj_category, progress):
+            parts_list_id, name, root_id = parts_list_data
 
-        for category in catalog.categories.values():
-            if category.parts:
-                parts.extend(category.parts)
-            else:
-                catalog.logger.warning(f'No PARTS in {catalog}/{category}')
+            parts_list = await create_category_instance(
+                catalog=obj_catalog,
+                category_id=parts_list_id,
+                name=name,
+                root_id=root_id,
+            )
+            await parts_list.fetch_parts(category=obj_category, test_api=test_api, t=progress)
 
-        if parts:
-            with tqdm(
-                    total=len(parts),
-                    bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
-                    postfix='') as t:
-                for part in parts:
-                    t.set_postfix_str(f"Validate detail {part}")
+        try:
+            for category in categories:
+                count = await count_parts_list(category_id=category.id)
+                async for parts_lists in self.process_fetch_parts_from_parts_lists(category_id=category.id, count=count):
+                    tasks = (asyncio.create_task(_process_batch_fetch_parts(
+                        parts_list_data=parts_list_data,
+                        obj_catalog=catalog,
+                        obj_category=category,
+                        progress=t)
+                    ) for parts_list_data in parts_lists)
 
-                    t.update()
+                    for task in asyncio.as_completed(tasks):
+                        await task
 
-                    if test_api:
-                        time.sleep(0.2)
+        except Exception as error:
+            catalog.logger.error(error)
+        finally:
+            # t.set_postfix_str(f'SUCCESS')
+            t.total = t.n
+            t.close()
 
-                    response = catalog.get_part(part_id=part.id)
+        t = tqdm(
+            total=0,
+            desc='Process validation details',
+            bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt}/{total_fmt} | {postfix}",
+        )
 
-                    if response.status_code != 200:
-                        catalog.logger.warning(
-                            f'Bad request {catalog.current_url} {catalog}/{part}')
-                        continue
+        async def _process_batch_validation(part_data, obj_catalog, obj_category, progress):
+            detail_id, name, _ = part_data
+            part = await create_part_instance(
+                catalog=obj_catalog,
+                category=obj_category,
+                part_id=detail_id,
+                name=name,
+            )
+            await part.validate(t=progress)
 
-                    data = response.json().get('data')
+        try:
+            for category in categories:
+                count = await count_parts(category_id=category.id)
+                t.total += count
+                async for details in self.process_validation_parts(category_id=category.id, count=count):
+                    tasks = (asyncio.create_task(_process_batch_validation(
+                        part_data=part_data,
+                        obj_catalog=catalog,
+                        obj_category=category,
+                        progress=t,
+                    )) for part_data in details)
 
-                    if not data:
-                        catalog.logger.warning(f'No data in {catalog}/{part})')
-                        continue
+                    for task in asyncio.as_completed(tasks):
+                        await task
 
-                    part.validate(data=data)
-                t.set_postfix_str('Details validated')
-        else:
-            catalog.logger.warning(f'No details in {catalog}')
+        except Exception as error:
+            catalog.logger.error(error)
+        finally:
+            # t.set_postfix_str(f'SUCCESS')
+            t.close()
 
 
 class TestLemkenCatalog(TestCatalogBase):
 
-    def test_tree(self, catalog, test_api):
+    async def test_tree(self, catalog, test_api):
         if catalog.categories:
-            state_while = True
-            index = 0
+            categories = list(catalog.categories.values())
+            t = tqdm(
+                total=None,
+                desc='Process partslists',
+                bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
+            )
+            tasks = (asyncio.create_task(self.process_children(category=category, test_api=test_api, t=t)) for category in
+                     categories)
 
-            while state_while:
-                categories = list(catalog.categories.values())
+            try:
+                for task in asyncio.as_completed(tasks):
+                    result = await task
 
-                if test_api:
-                    categories = [list(catalog.categories.values())[index]]
-
-                level_1 = self.get_children(categories=categories, test_api=test_api)
-
-                if level_1:
-                    level_2 = self.get_children(categories=level_1, test_api=test_api)
-
-                    if level_2:
-                        if test_api:
-                            category = categories[0]
-                            category.add_part_lists(level_2)
-                            state_while = False
-                        else:
-                            for part_list in level_2:
-                                category = catalog.categories[part_list.root_id]
-                                category.add_part_lists(part_list)
-                            index += 1
-                    else:
-                        index += 1
-                else:
-                    index += 1
-
-                if index == len(catalog.categories):
-                    state_while = False
+                    if result and test_api:
+                        for remaining_task in tasks:
+                            if remaining_task != task and not remaining_task.done():
+                                remaining_task.cancel()
+                        break
+            except Exception as error:
+                catalog.logger.error(error)
+            finally:
+                t.set_postfix_str('SUCCESS')
+                t.total = t.n
+                t.close()
         else:
             catalog.logger.warning(f'No Categories in {catalog}')
 
@@ -460,17 +540,17 @@ class TestCatalog:
 
         return test_class()
 
-    def test_root_categories(self, catalog, test_api):
+    async def test_root_categories(self, catalog, test_api):
         instance = self._get_test_instance(catalog)
-        instance.test_root_categories(catalog, test_api)
+        await instance.test_root_categories(catalog, test_api)
 
-    def test_tree(self, catalog, test_api):
+    async def test_tree(self, catalog, test_api):
         instance = self._get_test_instance(catalog)
-        instance.test_tree(catalog, test_api)
+        await instance.test_tree(catalog, test_api)
 
-    def test_parts(self, catalog, test_api):
+    async def test_parts(self, catalog, test_api):
         instance = self._get_test_instance(catalog)
-        instance.test_parts(catalog, test_api)
+        await instance.test_parts(catalog, test_api)
 
 
 

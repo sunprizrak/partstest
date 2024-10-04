@@ -4,3 +4,7 @@ colorama
 InquirerPy
 allure-pytest
 tqdm
+aiohttp
+pytest-asyncio
+nest-asyncio
+aiosqlite

@@ -1,7 +1,10 @@
+import asyncio
 import time
 from abc import ABC, abstractmethod
+from random import randint
+
 from tqdm import tqdm
-from src.catalog.part import create_part_instance
+from database import add_detail as db_add_detail
 
 
 class Category(ABC):
@@ -13,115 +16,100 @@ class Category(ABC):
             self.root_id = kwargs.get('root_id')
         self.id = kwargs.get('category_id')
         self.name = kwargs.get('name')
-        self.children = []
-        self.part_lists = []
-        self.parts = []
         self.validation_fields = set()
         self.validation_image_fields = set()
 
-    def add_children(self, child_id, child_name, root_id):
-        child = create_category_instance(catalog=self.catalog, category_id=child_id, name=child_name, root_id=root_id)
-        self.children.append(child)
-        return child
+    async def process_save_part(self, data, t):
+        part_id = data.get('id')
+        name = data.get(self.name_label_part)
 
-    def add_part_lists(self, part_list):
-        if isinstance(part_list, list):
-            self.part_lists.extend(part_list)
-        else:
-            self.part_lists.append(part_list)
+        await db_add_detail(
+            detail_id=part_id,
+            name=name,
+            category_id=self.root_id,
+        )
 
-    def add_part(self, part_id, name):
-        part = create_part_instance(catalog=self.catalog, category=self, part_id=part_id, name=name)
-        self.parts.append(part)
-
-    @abstractmethod
-    def get_parts(self, test_api):
-        with tqdm(
-                total=len(self.part_lists),
-                bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
-                postfix='') as t:
-            for part_list in self.part_lists:
-
-                t.set_postfix_str(f"Receive details from {part_list}")
-                t.update()
-                response = self.catalog.get_parts(child_id=part_list.id)
-
-                if response.status_code != 200:
-                    self.catalog.logger.warning(
-                        f'Bad request {self.catalog.current_url} {self.catalog}/{self}/{part_list} ')
-                    continue
-
-                data = response.json().get('data')
-
-                if not data:
-                    self.catalog.logger.warning(
-                        f'No details in {self.catalog}/{self}/{part_list}')
-                    continue
-
-                if test_api:
-                    data = data[:1]
-
-                for part in data:
-                    part_id = part.get('id')
-                    part_name = part.get(self.name_label_part)
-                    self.add_part(part_id=part_id, name=part_name)
-
-                if test_api:
-                    time.sleep(0.2)
-            t.set_postfix_str('Details received')
+        t.set_postfix_str(f'{name} {part_id} FROM {self}')
+        t.update()
+        t.total = t.n * randint(2, 3)
 
     @abstractmethod
-    def get_children(self, test_api, part_list):
-        response = self.catalog.get_category(category_id=self.id)
+    async def fetch_parts(self, category, test_api, t):
+        data_json = await self.catalog.fetch_parts(part_list_id=self.id)
 
-        if response.status_code != 200:
-            self.catalog.logger.warning(
-                f'Bad request {self.catalog.current_url} {self.catalog}/{self}')
-            return False
+        if data_json:
+            data = data_json.get('data')
 
-        data = response.json().get('data')
-
-        if not data:
-            self.catalog.logger.warning(
-                f'Note data in {self.catalog}/{self}')
-            return False
-
-        if test_api:
-            data = data[:1]
-
-        for subcategory in data:
-            if part_list:
-                children = data
-            else:
-                children = subcategory.get('children')
-
-            if not children:
-                self.catalog.logger.warning(
-                    f'No children in data {self.catalog}/{self}')
-                continue
+            if not data:
+                self.catalog.logger.warning(f'No details in {self.catalog}/{category}/{self}')
+                return
 
             if test_api:
-                children = children[:1]
+                data = data[:1]
 
-            for child_data in children:
-                child_id = child_data.get('id')
-                child_name = child_data.get(self.catalog.name_label_category)
+            tasks = (self.process_save_part(data=part_data, t=t) for part_data in data)
 
-                kwargs_dict = {
-                    'child_id': child_id,
-                    'child_name': child_name,
-                }
-
-                if hasattr(self, 'root_id'):
-                    kwargs_dict['root_id'] = self.root_id
-                else:
-                    kwargs_dict['root_id'] = self.id
-
-                self.add_children(**kwargs_dict)
-        return self.children
+            for task in asyncio.as_completed(tasks):
+                await task
 
     @abstractmethod
-    def validate(self, data: dict):
+    async def fetch_children(self, test_api, part_list):
+        data_json = await self.catalog.fetch_category(category_id=self.id)
+
+        if data_json:
+            category_data = data_json.get('data')
+
+            if not category_data:
+                self.catalog.logger.warning(
+                    f'Note data in {self.catalog}/{self}')
+                yield False
+
+            if test_api:
+                category_data = category_data[:1]
+
+            async def fetch_child_data(child_data):
+                if child_data:
+                    child_id = child_data.get('id')
+                    child_name = child_data.get(self.catalog.name_label_category)
+
+                    if hasattr(self, 'root_id'):
+                        root_id = self.root_id
+                    else:
+                        root_id = self.id
+
+                    obj = await create_category_instance(
+                        catalog=self.catalog,
+                        category_id=child_id,
+                        name=child_name,
+                        root_id=root_id,
+                    )
+                    return obj
+
+            async def fetch_children_data(category):
+                children_data = category.get('children')
+                if not children_data:
+                    self.catalog.logger.warning(f'No children in data {self.catalog}/{self}')
+
+                return children_data
+
+            category_tasks = (fetch_children_data(category=data) for data in category_data)
+
+            for ctr_task in asyncio.as_completed(category_tasks):
+                children = await ctr_task
+
+                if children:
+                    if test_api:
+                        children = children[:1]
+
+                    children_tasks = (fetch_child_data(child_data=child_data) for child_data in children)
+                    for child_task in asyncio.as_completed(children_tasks):
+                        child = await child_task
+                        yield child
+            else:
+                yield False
+
+    @abstractmethod
+    async def validate(self, data: dict):
         image_fields = data.get('imageFields')
 
         missing_fields = self.validation_fields - data.keys()
@@ -155,14 +143,15 @@ class LemkenCategory(Category):
         }
         self.validation_image_fields = {'name', 's3'}
 
-    def validate(self, data: dict):
-        return super().validate(data=data)
+    async def validate(self, data: dict):
+        await super().validate(data=data)
 
-    def get_children(self, test_api, part_list=None):
-        return super().get_children(test_api, part_list)
+    async def fetch_children(self, test_api, part_list):
+        async for child in super().fetch_children(test_api, part_list):
+            yield child
 
-    def get_parts(self, test_api):
-        return super().get_parts(test_api)
+    async def fetch_parts(self, category, test_api, t):
+        await super().fetch_parts(category, test_api, t)
 
 
 class KubotaCategory(Category):
@@ -179,7 +168,7 @@ class KubotaCategory(Category):
     def validate(self, data: dict):
         return super().validate(data=data)
 
-    def get_children(self, test_api, part_list=None):
+    def fetch_children(self, test_api, part_list=None):
         return super().get_children(test_api, part_list)
 
     def get_parts(self, test_api):
@@ -236,7 +225,7 @@ class GrimmeCategory(Category):
                 bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
                 postfix='') as t:
             for part_list in self.part_lists:
-                t.set_postfix_str(f"Receive details from {part_list}")
+                t.set_postfix_str(f"details from {part_list}")
                 t.update()
 
                 response = self.catalog.get_category(category_id=part_list.id)
@@ -371,7 +360,7 @@ class RopaCategory(Category):
         return super().get_parts(test_api)
 
 
-def create_category_instance(catalog, category_id, name, root_id=None):
+async def create_category_instance(catalog, category_id, name, root_id=None):
     cls = globals().get(f"{catalog.name.capitalize()}Category")
     cleaned_name = name.strip().replace('\n', '')
     if cls is None:
