@@ -1,3 +1,4 @@
+import asyncio
 from abc import ABC, abstractmethod
 
 
@@ -13,9 +14,10 @@ class Part(ABC):
         self.validation_category_fields = set()
 
     @abstractmethod
-    async def validate(self, t):
-        t.set_postfix_str(f'{self}')
-        t.update()
+    async def validate(self, progress):
+        progress.set_postfix_str(f'{self}')
+        progress.update()
+
         data_json = await self.catalog.fetch_part(part_id=self.id)
 
         if data_json:
@@ -66,8 +68,8 @@ class LemkenPart(Part):
         self.validation_image_fields = {'name', 's3'}
         self.validation_category_fields = {'id'}
 
-    async def validate(self, t):
-        await super().validate(t)
+    async def validate(self, progress):
+        await super().validate(progress)
 
 
 class KubotaPart(Part):

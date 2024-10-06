@@ -3,9 +3,6 @@ import os
 import logging
 from datetime import datetime
 from abc import ABC, abstractmethod
-
-from aiohttp import ClientError, ClientTimeout
-
 from src.catalog.category import create_category_instance
 import asyncio
 from database import add_category as db_add_category
@@ -55,7 +52,7 @@ class Catalog(ABC):
         logger.addHandler(file_handler)
         return logger
 
-    async def _make_request(self, url, retries=10, delay=2, timeout=30):
+    async def _make_request(self, url, retries=10, delay=2, timeout=60):
         """
         Выполняет асинхронный запрос с повторными попытками в случае таймаута.
         :param url: URL для запроса
@@ -71,7 +68,7 @@ class Catalog(ABC):
                     async with session.get(url, timeout=timeout) as response:
                         response.raise_for_status()
                         return await response.json()
-                except (ClientError, ClientTimeout) as error:
+                except (aiohttp.ClientError, asyncio.TimeoutError) as error:
                     self.logger.warning(f"{self.name} {url} Ошибка при попытке {attempt}/{retries}: {error}")
 
                     if attempt == retries:

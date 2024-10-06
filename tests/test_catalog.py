@@ -22,27 +22,23 @@ class NoDataException(Exception):
 
 class CatalogTestUtility:
 
-    async def process_children(self, category, test_api, t, depth=1, part_list=None, semaphore=None):
-        if semaphore is None:
-            semaphore = asyncio.Semaphore(10)
-
+    async def process_children(self, category, test_api, t, depth=1, part_list=None):
         if depth > category.catalog.depth:
             return
 
         async for child in category.fetch_children(test_api=test_api, part_list=part_list):
-            async with semaphore:
-                if child:
-                    t.set_postfix_str(f'{child} FROM {category}')
-                    t.update()
-                    t.total = t.n * randint(2, 3)
-                    has_children = True
-                    if depth == category.catalog.depth:
-                        await add_parts_list(
-                            root_id=child.root_id,
-                            parts_list_id=child.id,
-                            name=child.name,
-                        )
-                    await self.process_children(category=child, test_api=test_api, t=t, depth=depth+1)
+            if child:
+                t.set_postfix_str(f'{child} FROM {category}')
+                t.update()
+                t.total = t.n * randint(2, 3)
+                has_children = True
+                if depth == category.catalog.depth:
+                    await add_parts_list(
+                        root_id=child.root_id,
+                        parts_list_id=child.id,
+                        name=child.name,
+                    )
+                await self.process_children(category=child, test_api=test_api, t=t, depth=depth+1)
         return has_children if test_api else None
 
     async def process_fetch_parts_from_parts_lists(self, category_id, count):
@@ -55,17 +51,6 @@ class CatalogTestUtility:
 
             for offset in range(0, count, batch_size):
                 batch = await fetch_parts_lists_batch(category_id=category_id, batch_size=batch_size, offset=offset)
-                yield batch
-
-    async def process_validation_parts(self, category_id, count):
-        if 0 < count < 50:
-            parts = await fetch_parts(category_id=category_id)
-            yield parts
-        elif count >= 50:
-            batch_size = 50
-
-            for offset in range(0, count, batch_size):
-                batch = await fetch_parts_batch(category_id=category_id, batch_size=batch_size, offset=offset)
                 yield batch
 
 
@@ -91,24 +76,24 @@ class TestCatalogBase(ABC, CatalogTestUtility):
             if data:
                 t = tqdm(
                     total=len(data),
-                    desc='Process',
+                    desc='Process root categories',
                     bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt}/{total_fmt} | {postfix}",
                     postfix=f'Receive categories from {catalog}',
                 )
 
-                async def process_category(category_data):
+                async def process_category(category_data, catalog):
                     category = await catalog.add_category(data=category_data)
                     t.set_postfix_str(f'{category} from {catalog}')
                     await category.validate(data=category_data)
 
-                tasks = (asyncio.create_task(process_category(category_data)) for category_data in data)
+                tasks = (asyncio.create_task(process_category(category_data=category_data, catalog=catalog)) for category_data in data)
                 try:
                     for task in asyncio.as_completed(tasks):
                         await task
                         t.update()
                         await asyncio.sleep(0.1)
                 finally:
-                    t.set_postfix_str(f"Categories from {catalog} received and validated")
+                    t.set_postfix_str(f"success")
                     t.close()
             else:
                 catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog}')
@@ -154,45 +139,51 @@ class TestCatalogBase(ABC, CatalogTestUtility):
         except Exception as error:
             catalog.logger.error(error)
         finally:
-            # t.set_postfix_str(f'SUCCESS')
             t.total = t.n
+            t.set_postfix_str(f'success')
             t.close()
 
+        total_parts = 0
+        for category in categories:
+            total_parts += await count_parts(category_id=category.id)
+
         t = tqdm(
-            total=0,
+            total=total_parts,
             desc='Process validation details',
             bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt}/{total_fmt} | {postfix}",
         )
 
-        async def _process_batch_validation(part_data, obj_catalog, obj_category, progress):
-            detail_id, name, _ = part_data
-            part = await create_part_instance(
-                catalog=obj_catalog,
-                category=obj_category,
-                part_id=detail_id,
-                name=name,
-            )
-            await part.validate(t=progress)
+        async def _process_validation(part_data, obj_catalog, obj_category, progress, semaphore):
+            async with semaphore:
+                detail_id, name, _ = part_data
+                part = await create_part_instance(
+                    catalog=obj_catalog,
+                    category=obj_category,
+                    part_id=detail_id,
+                    name=name,
+                )
+                await part.validate(progress=progress)
+
+        semaphore = asyncio.Semaphore(200)
 
         try:
             for category in categories:
-                count = await count_parts(category_id=category.id)
-                t.total += count
-                async for details in self.process_validation_parts(category_id=category.id, count=count):
-                    tasks = (asyncio.create_task(_process_batch_validation(
-                        part_data=part_data,
-                        obj_catalog=catalog,
-                        obj_category=category,
-                        progress=t,
-                    )) for part_data in details)
+                parts = await fetch_parts(category_id=category.id)
 
-                    for task in asyncio.as_completed(tasks):
-                        await task
+                tasks = [asyncio.create_task(_process_validation(
+                    part_data=part_data,
+                    obj_catalog=catalog,
+                    obj_category=category,
+                    progress=t,
+                    semaphore=semaphore,
+                )) for part_data in parts]
 
+                for task in asyncio.as_completed(tasks):
+                    await task
         except Exception as error:
             catalog.logger.error(error)
         finally:
-            # t.set_postfix_str(f'SUCCESS')
+            t.set_postfix_str(f'SUCCESS')
             t.close()
 
 
@@ -221,7 +212,7 @@ class TestLemkenCatalog(TestCatalogBase):
             except Exception as error:
                 catalog.logger.error(error)
             finally:
-                t.set_postfix_str('SUCCESS')
+                t.set_postfix_str('success')
                 t.total = t.n
                 t.close()
         else:
