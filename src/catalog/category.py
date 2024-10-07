@@ -61,8 +61,8 @@ class Category(ABC):
 
             if not category_data:
                 self.catalog.logger.warning(
-                    f'Note data in {self.catalog}/{self}')
-                yield False
+                    f'No data in {self.catalog}/{self}')
+                return
 
             if test_api:
                 category_data = category_data[:1]
@@ -104,9 +104,10 @@ class Category(ABC):
                     children_tasks = (fetch_child_data(child_data=child_data) for child_data in children)
                     for child_task in asyncio.as_completed(children_tasks):
                         child = await child_task
-                        yield child
-            else:
-                yield False
+                        if child:
+                            yield child
+        else:
+            return
 
     @abstractmethod
     async def validate(self, data: dict):

@@ -5,8 +5,8 @@ import aiosqlite
 import os
 
 
-# if os.path.exists('db.sqlite'):
-#     os.remove('db.sqlite')
+if os.path.exists('db.sqlite'):
+    os.remove('db.sqlite')
 
 
 async def initialize_db():

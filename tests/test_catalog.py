@@ -9,7 +9,7 @@ from src.catalog.part import create_part_instance
 from tests.conftest import catalog
 from utility import update_spinner
 from database import add_parts_list, count_parts_list, count_parts, fetch_all_parts_lists, fetch_parts_lists_batch, \
-    fetch_parts, fetch_parts_batch
+    fetch_parts
 
 nest_asyncio.apply()
 
@@ -28,18 +28,17 @@ class CatalogTestUtility:
 
         async for child in category.fetch_children(test_api=test_api, part_list=part_list):
             if child:
-                t.set_postfix_str(f'{child} FROM {category}')
-                t.update()
+                t.set_postfix_str(f'{child} from {category}')
                 t.total = t.n * randint(2, 3)
-                has_children = True
+                t.refresh()
                 if depth == category.catalog.depth:
+                    t.update()
                     await add_parts_list(
                         root_id=child.root_id,
                         parts_list_id=child.id,
                         name=child.name,
                     )
                 await self.process_children(category=child, test_api=test_api, t=t, depth=depth+1)
-        return has_children if test_api else None
 
     async def process_fetch_parts_from_parts_lists(self, category_id, count):
         if 0 < count < 50:
@@ -134,8 +133,10 @@ class TestCatalogBase(ABC, CatalogTestUtility):
                     ) for parts_list_data in parts_lists)
 
                     for task in asyncio.as_completed(tasks):
-                        await task
+                        result = await task
 
+                        if result and test_api:
+                            return
         except Exception as error:
             catalog.logger.error(error)
         finally:
@@ -170,20 +171,24 @@ class TestCatalogBase(ABC, CatalogTestUtility):
             for category in categories:
                 parts = await fetch_parts(category_id=category.id)
 
-                tasks = [asyncio.create_task(_process_validation(
-                    part_data=part_data,
-                    obj_catalog=catalog,
-                    obj_category=category,
-                    progress=t,
-                    semaphore=semaphore,
-                )) for part_data in parts]
+                if parts:
+                    tasks = [asyncio.create_task(_process_validation(
+                        part_data=part_data,
+                        obj_catalog=catalog,
+                        obj_category=category,
+                        progress=t,
+                        semaphore=semaphore,
+                    )) for part_data in parts]
 
-                for task in asyncio.as_completed(tasks):
-                    await task
+                    for task in asyncio.as_completed(tasks):
+                        await task
+
+                    if test_api:
+                        return
         except Exception as error:
             catalog.logger.error(error)
         finally:
-            t.set_postfix_str(f'SUCCESS')
+            t.set_postfix_str(f'success')
             t.close()
 
 
@@ -194,7 +199,7 @@ class TestLemkenCatalog(TestCatalogBase):
             categories = list(catalog.categories.values())
             t = tqdm(
                 total=None,
-                desc='Process partslists',
+                desc='Process tree traversal and parlists retrieval',
                 bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
             )
             tasks = (asyncio.create_task(self.process_children(category=category, test_api=test_api, t=t)) for category in
@@ -202,13 +207,7 @@ class TestLemkenCatalog(TestCatalogBase):
 
             try:
                 for task in asyncio.as_completed(tasks):
-                    result = await task
-
-                    if result and test_api:
-                        for remaining_task in tasks:
-                            if remaining_task != task and not remaining_task.done():
-                                remaining_task.cancel()
-                        break
+                    await task
             except Exception as error:
                 catalog.logger.error(error)
             finally:
