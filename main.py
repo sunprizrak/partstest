@@ -125,9 +125,9 @@ async def open_menu(**kwargs):
             level.clean()
             await start_app()
     else:
-        brand_slug = menu.get(choice)  # tests/test_catalog.py::TestCatalog::test_tree
+        brand_slug = menu.get(choice)
         catalog_menu = {
-                'Тест каталога': f'-s -v tests/test_catalog.py::TestCatalog::test_root_categories tests/test_catalog.py::TestCatalog::test_parts --catalogs={brand_slug} --alluredir allure_results',
+                'Тест каталога': f'-s -v tests/test_catalog.py::TestCatalog::test_root_categories tests/test_catalog.py::TestCatalog::test_tree tests/test_catalog.py::TestCatalog::test_parts --catalogs={brand_slug} --alluredir allure_results',
                 'Тест дерева': f'-s -v tests/test_catalog.py::TestCatalog::test_root_categories tests/test_catalog.py::TestCatalog::test_tree --catalogs={brand_slug} --alluredir allure_results',
                 'Тест корневых категорий': f'-s -v tests/test_catalog.py::TestCatalog::test_root_categories --catalogs={brand_slug} --alluredir allure_results',
                 'Тест API': f'-s -v tests/test_catalog.py::TestCatalog::test_root_categories tests/test_catalog.py::TestCatalog::test_tree tests/test_catalog.py::TestCatalog::test_parts --catalogs={brand_slug} --test_api --alluredir allure_results',

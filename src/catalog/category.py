@@ -5,6 +5,7 @@ from random import randint
 
 from tqdm import tqdm
 from database import add_detail as db_add_detail
+from tests.conftest import catalog
 
 
 class Category(ABC):
@@ -19,7 +20,7 @@ class Category(ABC):
         self.validation_fields = set()
         self.validation_image_fields = set()
 
-    async def process_save_part(self, data, t):
+    async def process_save_part(self, data, t, catalog_name):
         part_id = data.get('id')
         name = data.get(self.name_label_part)
 
@@ -27,6 +28,7 @@ class Category(ABC):
             detail_id=part_id,
             name=name,
             category_id=self.root_id,
+            catalog_name=catalog_name,
         )
 
         t.set_postfix_str(f'{name} {part_id} FROM {self}')
@@ -47,7 +49,7 @@ class Category(ABC):
             if test_api:
                 data = data[:1]
 
-            tasks = (self.process_save_part(data=part_data, t=t) for part_data in data)
+            tasks = (self.process_save_part(data=part_data, t=t, catalog_name=self.catalog.name) for part_data in data)
 
             for task in asyncio.as_completed(tasks):
                 await task
@@ -85,27 +87,38 @@ class Category(ABC):
                     )
                     return obj
 
-            async def fetch_children_data(category):
-                children_data = category.get('children')
-                if not children_data:
-                    self.catalog.logger.warning(f'No children in data {self.catalog}/{self}')
+            async def fetch_children_data(data):
+                if part_list:
+                    children = data
+                else:
+                    children = data.get('children')
+                if not children:
+                    self.catalog.logger.warning(f'No children {self.catalog}/{self}')
 
-                return children_data
+                return children
 
-            category_tasks = (fetch_children_data(category=data) for data in category_data)
+            if test_api and part_list:
+                category_data = category_data[:1]
+
+            category_tasks = (fetch_children_data(data=data) for data in category_data)
 
             for ctr_task in asyncio.as_completed(category_tasks):
-                children = await ctr_task
+                result = await ctr_task
 
-                if children:
-                    if test_api:
-                        children = children[:1]
-
-                    children_tasks = (fetch_child_data(child_data=child_data) for child_data in children)
-                    for child_task in asyncio.as_completed(children_tasks):
-                        child = await child_task
+                if result:
+                    if part_list:
+                        child = await fetch_child_data(child_data=result)
                         if child:
                             yield child
+                    else:
+                        if test_api:
+                            result = result[:1]
+
+                        children_tasks = (fetch_child_data(child_data=child_data) for child_data in result)
+                        for child_task in asyncio.as_completed(children_tasks):
+                            child = await child_task
+                            if child:
+                                yield child
         else:
             return
 
@@ -145,7 +158,7 @@ class LemkenCategory(Category):
         self.validation_image_fields = {'name', 's3'}
 
     async def validate(self, data: dict):
-        await super().validate(data=data)
+        await super().validate(data)
 
     async def fetch_children(self, test_api, part_list):
         async for child in super().fetch_children(test_api, part_list):
@@ -166,17 +179,19 @@ class KubotaCategory(Category):
         }
         self.validation_image_fields = {'name', 's3'}
 
-    def validate(self, data: dict):
-        return super().validate(data=data)
+    async def validate(self, data: dict):
+        await super().validate(data)
 
-    def fetch_children(self, test_api, part_list=None):
-        return super().get_children(test_api, part_list)
+    async def fetch_children(self, test_api, part_list):
+        async for child in super().fetch_children(test_api, part_list):
+            yield child
 
-    def get_parts(self, test_api):
-        return super().get_parts(test_api)
+    async def fetch_parts(self, category, test_api, t):
+        await super().fetch_parts(category, test_api, t)
 
 
 class GrimmeCategory(Category):
+
     def __init__(self, *args, **kwargs):
         super(GrimmeCategory, self).__init__(*args, **kwargs)
         self.modifications = []
@@ -185,78 +200,66 @@ class GrimmeCategory(Category):
             'children', 'created_at', 'updated_at',
         }
 
-    def get_children(self, test_api, part_list=None):
-        response = self.catalog.get_category(category_id=self.id)
+    async def validate(self, data):
+        await super().validate(data)
 
-        if response.status_code != 200:
-            self.catalog.logger.warning(
-                f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-            return False
+    async def fetch_children(self, test_api, part_list):
+        data_json = await self.catalog.fetch_category(category_id=self.id)
 
-        children = response.json().get('data')
+        if data_json:
+            children = data_json.get('data')
 
-        if not children:
-            self.catalog.logger.warning(
-                f'No children in data catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id}')
-            return False
+            if not children:
+                self.catalog.logger.warning(
+                    f'No children in data: {self.catalog.name}/{self}')
+                return
 
-        if test_api:
-            children = children[:1]
+            if test_api:
+                children = children[:1]
 
-        for child_data in children:
-            child_id = child_data.get('id')
-            child_name = child_data.get(self.catalog.name_label_category)
+            async def fetch_child_data(child_data):
+                if child_data:
+                    child_id = child_data.get('id')
+                    child_name = child_data.get(self.catalog.name_label_category)
 
-            kwargs_dict = {
-                'child_id': child_id,
-                'child_name': child_name,
-            }
+                    if hasattr(self, 'root_id'):
+                        root_id = self.root_id
+                    else:
+                        root_id = self.id
 
-            if hasattr(self, 'root_id'):
-                kwargs_dict['root_id'] = self.root_id
-            else:
-                kwargs_dict['root_id'] = self.id
+                    obj = await create_category_instance(
+                        catalog=self.catalog,
+                        category_id=child_id,
+                        name=child_name,
+                        root_id=root_id,
+                    )
+                    return obj
 
-            self.add_children(**kwargs_dict)
-        return self.children
+            children_tasks = (fetch_child_data(child_data=child_data) for child_data in children)
+            for child_task in asyncio.as_completed(children_tasks):
+                child = await child_task
+                if child:
+                    yield child
+        else:
+            return
 
-    def get_parts(self, test_api):
-        with tqdm(
-                total=len(self.part_lists),
-                bar_format="{l_bar}{bar:30} | {n_fmt}/{total_fmt} {postfix}",
-                postfix='') as t:
-            for part_list in self.part_lists:
-                t.set_postfix_str(f"details from {part_list}")
-                t.update()
+    async def fetch_parts(self, category, test_api, t):
+        data_json = await self.catalog.fetch_category(category_id=self.id)
 
-                response = self.catalog.get_category(category_id=part_list.id)
+        if data_json:
+            data = data_json.get('data')
 
-                if response.status_code != 200:
-                    self.catalog.logger.warning(
-                        f'Bad request {self.catalog.current_url} catalog: {self.catalog.name} category_name: {self.name} category_id: {self.id} part_list_id: {part_list.id} ')
-                    continue
+            if not data:
+                self.catalog.logger.warning(f'No details in {self.catalog}/{category}/{self}')
+                return
 
-                data = response.json().get('data')
+            if test_api:
+                data = data[:1]
 
-                if not data:
-                    self.catalog.logger.warning(
-                        f'No Parts in {self.catalog.name} category_name: {self.name} category_id: {self.id} part_list_id: {part_list.id}')
-                    continue
+            tasks = (self.process_save_part(data=part_data, t=t) for part_data in data)
 
-                if test_api:
-                    data = data[:1]
-
-                for part in data:
-                    part_id = part.get('id')
-                    part_name = part.get(self.name_label_part)
-                    self.add_part(part_id=part_id, name=part_name)
-
-                if test_api:
-                    time.sleep(0.2)
-            t.set_postfix_str('Details received')
-
-    def validate(self, data: dict):
-        return super().validate(data=data)
+            for task in asyncio.as_completed(tasks):
+                await task
 
 
 class KroneCategory(Category):
@@ -270,14 +273,15 @@ class KroneCategory(Category):
         }
         self.validation_image_fields = {'name', 's3'}
 
-    def validate(self, data: dict):
-        return super().validate(data=data)
+    async def validate(self, data: dict):
+        await super().validate(data)
 
-    def get_children(self, test_api, part_list=None):
-        return super().get_children(test_api, part_list)
+    async def fetch_children(self, test_api, part_list):
+        async for child in super().fetch_children(test_api, part_list):
+            yield child
 
-    def get_parts(self, test_api):
-        return super().get_parts(test_api)
+    async def fetch_parts(self, category, test_api, t):
+        await super().fetch_parts(category, test_api, t)
 
 
 class KvernelandCategory(Category):
@@ -290,14 +294,15 @@ class KvernelandCategory(Category):
         }
         self.validation_image_fields = {'name', 's3'}
 
-    def validate(self, data: dict):
-        return super().validate(data=data)
+    async def validate(self, data):
+        await super().validate(data)
 
-    def get_parts(self, test_api):
-        return super().get_parts(test_api)
+    async def fetch_children(self, test_api, part_list):
+        async for child in super().fetch_children(test_api, part_list):
+            yield child
 
-    def get_children(self, test_api, part_list=None):
-        return super().get_children(test_api, part_list)
+    async def fetch_parts(self, category, test_api, t):
+        await super().fetch_parts(category, test_api, t)
 
 
 class JdeereCategory(Category):
@@ -311,14 +316,15 @@ class JdeereCategory(Category):
         }
         self.validation_image_fields = {'name', 's3'}
 
-    def validate(self, data: dict):
-        return super().validate(data=data)
+    async def validate(self, data: dict):
+        await super().validate(data)
 
-    def get_parts(self, test_api):
-        return super().get_parts(test_api)
+    async def fetch_children(self, test_api, part_list):
+        async for child in super().fetch_children(test_api, part_list):
+            yield child
 
-    def get_children(self, test_api, part_list=None):
-        return super().get_children(test_api, part_list)
+    async def fetch_parts(self, category, test_api, t):
+        await super().fetch_parts(category, test_api, t)
 
 
 class ClaasCategory(Category):
@@ -332,14 +338,15 @@ class ClaasCategory(Category):
         }
         self.validation_image_fields = {'name', 's3'}
 
-    def validate(self, data: dict):
-        return super().validate(data=data)
+    async def validate(self, data):
+        await super().validate(data)
 
-    def get_children(self, test_api, part_list=None):
-        return super().get_children(test_api, part_list)
+    async def fetch_children(self, test_api, part_list):
+        async for child in super().fetch_children(test_api, part_list):
+            yield child
 
-    def get_parts(self, test_api):
-        return super().get_parts(test_api)
+    async def fetch_parts(self, category, test_api, t):
+        await super().fetch_parts(category, test_api, t)
 
 
 class RopaCategory(Category):
@@ -351,14 +358,15 @@ class RopaCategory(Category):
         }
         self.validation_image_fields = {'name', 's3'}
 
-    def validate(self, data: dict):
-        return super().validate(data=data)
+    async def validate(self, data):
+        await super().validate(data)
 
-    def get_children(self, test_api, part_list=None):
-        return super().get_children(test_api, part_list)
+    async def fetch_children(self, test_api, part_list):
+        async for child in super().fetch_children(test_api, part_list):
+            yield child
 
-    def get_parts(self, test_api):
-        return super().get_parts(test_api)
+    async def fetch_parts(self, category, test_api, t):
+        await super().fetch_parts(category, test_api, t)
 
 
 async def create_category_instance(catalog, category_id, name, root_id=None):

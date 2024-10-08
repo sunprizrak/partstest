@@ -22,34 +22,41 @@ class NoDataException(Exception):
 
 class CatalogTestUtility:
 
-    async def process_children(self, category, test_api, t, depth=1, part_list=None):
-        if depth > category.catalog.depth:
+    async def process_children(self, catalog, category, test_api, t, depth=1, part_list=None):
+        if depth > catalog.depth:
             return
 
         async for child in category.fetch_children(test_api=test_api, part_list=part_list):
             if child:
                 t.set_postfix_str(f'{child} from {category}')
                 t.total = t.n * randint(2, 3)
-                t.refresh()
-                if depth == category.catalog.depth:
+
+                if depth == catalog.depth:
                     t.update()
                     await add_parts_list(
                         root_id=child.root_id,
                         parts_list_id=child.id,
                         name=child.name,
+                        catalog_name=catalog.name,
                     )
-                await self.process_children(category=child, test_api=test_api, t=t, depth=depth+1)
 
-    async def process_fetch_parts_from_parts_lists(self, category_id, count):
+                depth += 1
+
+                if part_list and depth == category.catalog.depth:
+                    await self.process_children(catalog=catalog, category=child, test_api=test_api, t=t, depth=depth, part_list=part_list)
+                else:
+                    await self.process_children(catalog=catalog, category=child, test_api=test_api, t=t, depth=depth)
+
+    async def process_fetch_parts_from_parts_lists(self, category_id, count, catalog_name):
         if 0 < count < 50:
-            parts_lists = await fetch_all_parts_lists(category_id=category_id)
+            parts_lists = await fetch_all_parts_lists(category_id=category_id, catalog_name=catalog_name)
             yield parts_lists
 
         elif count >= 50:
             batch_size = 50
 
             for offset in range(0, count, batch_size):
-                batch = await fetch_parts_lists_batch(category_id=category_id, batch_size=batch_size, offset=offset)
+                batch = await fetch_parts_lists_batch(category_id=category_id, batch_size=batch_size, offset=offset, catalog_name=catalog_name)
                 yield batch
 
 
@@ -92,14 +99,31 @@ class TestCatalogBase(ABC, CatalogTestUtility):
                         t.update()
                         await asyncio.sleep(0.1)
                 finally:
-                    t.set_postfix_str(f"success")
                     t.close()
             else:
                 catalog.logger.warning(f'No data in {catalog.current_url} catalog: {catalog}')
 
     @abstractmethod
     async def test_tree(self, catalog, test_api):
-        pass
+        if catalog.categories:
+            categories = list(catalog.categories.values())
+            t = tqdm(
+                total=None,
+                desc='Process tree traversal and parlists retrieval',
+                bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
+            )
+            tasks = (asyncio.create_task(self.process_children(catalog=catalog, category=category, test_api=test_api, t=t)) for category in categories)
+
+            try:
+                for task in asyncio.as_completed(tasks):
+                    await task
+            except Exception as error:
+                catalog.logger.error(error)
+            finally:
+                t.total = t.n
+                t.close()
+        else:
+            catalog.logger.warning(f'No Categories in {catalog}')
 
     async def test_parts(self, catalog, test_api):
         categories = list(catalog.categories.values())
@@ -123,8 +147,8 @@ class TestCatalogBase(ABC, CatalogTestUtility):
 
         try:
             for category in categories:
-                count = await count_parts_list(category_id=category.id)
-                async for parts_lists in self.process_fetch_parts_from_parts_lists(category_id=category.id, count=count):
+                count = await count_parts_list(category_id=category.id, catalog_name=catalog.name)
+                async for parts_lists in self.process_fetch_parts_from_parts_lists(category_id=category.id, count=count, catalog_name=catalog.name):
                     tasks = (asyncio.create_task(_process_batch_fetch_parts(
                         parts_list_data=parts_list_data,
                         obj_catalog=catalog,
@@ -141,12 +165,11 @@ class TestCatalogBase(ABC, CatalogTestUtility):
             catalog.logger.error(error)
         finally:
             t.total = t.n
-            t.set_postfix_str(f'success')
             t.close()
 
         total_parts = 0
         for category in categories:
-            total_parts += await count_parts(category_id=category.id)
+            total_parts += await count_parts(category_id=category.id, catalog_name=catalog.name)
 
         t = tqdm(
             total=total_parts,
@@ -169,7 +192,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
 
         try:
             for category in categories:
-                parts = await fetch_parts(category_id=category.id)
+                parts = await fetch_parts(category_id=category.id, catalog_name=catalog.name)
 
                 if parts:
                     tasks = [asyncio.create_task(_process_validation(
@@ -188,11 +211,34 @@ class TestCatalogBase(ABC, CatalogTestUtility):
         except Exception as error:
             catalog.logger.error(error)
         finally:
-            t.set_postfix_str(f'success')
             t.close()
 
 
 class TestLemkenCatalog(TestCatalogBase):
+
+    async def test_tree(self, catalog, test_api):
+        await super().test_tree(catalog, test_api)
+
+
+class TestGrimmeCatalog(TestCatalogBase):
+
+    async def test_tree(self, catalog, test_api):
+        await super().test_tree(catalog, test_api)
+
+
+class TestKubotaCatalog(TestCatalogBase):
+
+    async def test_tree(self, catalog, test_api):
+        await super().test_tree(catalog, test_api)
+
+
+class TestClaasCatalog(TestCatalogBase):
+
+    async def test_tree(self, catalog, test_api):
+        await super().test_tree(catalog, test_api)
+
+
+class TestKroneCatalog(TestCatalogBase):
 
     async def test_tree(self, catalog, test_api):
         if catalog.categories:
@@ -202,8 +248,7 @@ class TestLemkenCatalog(TestCatalogBase):
                 desc='Process tree traversal and parlists retrieval',
                 bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
             )
-            tasks = (asyncio.create_task(self.process_children(category=category, test_api=test_api, t=t)) for category in
-                     categories)
+            tasks = (asyncio.create_task(self.process_children(catalog=catalog, category=category, test_api=test_api, t=t, part_list=True)) for category in categories)
 
             try:
                 for task in asyncio.as_completed(tasks):
@@ -211,313 +256,50 @@ class TestLemkenCatalog(TestCatalogBase):
             except Exception as error:
                 catalog.logger.error(error)
             finally:
-                t.set_postfix_str('success')
                 t.total = t.n
                 t.close()
         else:
             catalog.logger.warning(f'No Categories in {catalog}')
 
 
-class TestGrimmeCatalog(TestCatalogBase):
-
-    def test_tree(self, catalog, test_api):
-        if catalog.categories:
-            state_while = True
-            index = 0
-
-            while state_while:
-                categories = list(catalog.categories.values())
-
-                if test_api:
-                    categories = [list(catalog.categories.values())[index]]
-
-                level_1 = self.get_children(categories=categories, test_api=test_api)
-
-                if level_1:
-                    level_2 = self.get_children(categories=level_1, test_api=test_api)
-
-                    if level_2:
-                        level_3 = self.get_children(categories=level_2, test_api=test_api)
-
-                        if level_3:
-                            level_4 = self.get_children(categories=level_3, test_api=test_api)
-
-                            if level_4:
-                                if test_api:
-                                    category = categories[0]
-                                    category.add_part_lists(level_4)
-                                    state_while = False
-                                else:
-                                    for part_list in level_3:
-                                        category = catalog.categories[part_list.root_id]
-                                        category.add_part_lists(part_list)
-                                    index += 1
-                            else:
-                                index += 1
-                        else:
-                            index += 1
-                    else:
-                        index += 1
-                else:
-                    index += 1
-
-                if index >= len(catalog.categories):
-                    state_while = False
-        else:
-            catalog.logger.warning(f'No Categories in {catalog}')
-
-
-class TestKubotaCatalog(TestCatalogBase):
-
-    def test_tree(self, catalog, test_api):
-        if catalog.categories:
-            state_while = True
-            index = 0
-
-            while state_while:
-                categories = list(catalog.categories.values())
-
-                if test_api:
-                    categories = [list(catalog.categories.values())[index]]
-
-                level_1 = self.get_children(categories=categories, test_api=test_api)
-
-                if level_1:
-                    level_2 = self.get_children(categories=level_1, test_api=test_api)
-
-                    if level_2:
-                        if test_api:
-                            category = categories[0]
-                            category.add_part_lists(level_2)
-                            state_while = False
-                        else:
-                            for part_list in level_2:
-                                category = catalog.categories[part_list.root_id]
-                                category.add_part_lists(part_list)
-                            index += 1
-                    else:
-                        index += 1
-                else:
-                    index += 1
-
-                if index >= len(catalog.categories):
-                    state_while = False
-        else:
-            catalog.logger.warning(f'No Categories in {catalog}')
-
-
-class TestClaasCatalog(TestCatalogBase):
-
-    def test_tree(self, catalog, test_api):
-        if catalog.categories:
-            state_while = True
-            index = 0
-
-            while state_while:
-                categories = list(catalog.categories.values())
-
-                if test_api:
-                    categories = [list(catalog.categories.values())[index]]
-
-                level_1 = self.get_children(categories=categories, test_api=test_api)
-
-                if level_1:
-                    level_2 = self.get_children(categories=level_1, test_api=test_api)
-
-                    if level_2:
-                        level_3 = self.get_children(categories=level_2, test_api=test_api)
-
-                        if level_3:
-                            if test_api:
-                                category = categories[0]
-                                category.add_part_lists(level_3)
-                                state_while = False
-                            else:
-                                for part_list in level_3:
-                                    category = catalog.categories[part_list.root_id]
-                                    category.add_part_lists(part_list)
-                                index += 1
-                        else:
-                            index += 1
-                    else:
-                        index += 1
-                else:
-                    index += 1
-
-                if index >= len(catalog.categories):
-                    state_while = False
-        else:
-            catalog.logger.warning(f'No Categories in {catalog}')
-
-
-class TestKroneCatalog(TestCatalogBase):
-
-    def test_tree(self, catalog, test_api):
-        if catalog.categories:
-            state_while = True
-            index = 0
-
-            while state_while:
-                categories = list(catalog.categories.values())
-
-                if test_api:
-                    categories = [list(catalog.categories.values())[index]]
-
-                level_1 = self.get_children(categories=categories, test_api=test_api)
-
-                if level_1:
-                    level_2 = self.get_children(categories=level_1, test_api=test_api)
-
-                    if level_2:
-                        level_3 = self.get_children(categories=level_2, test_api=test_api, part_list=True)
-
-                        if level_3:
-                            if test_api:
-                                category = categories[0]
-                                category.add_part_lists(level_3)
-                                state_while = False
-                            else:
-                                for part_list in level_3:
-                                    category = catalog.categories[part_list.root_id]
-                                    category.add_part_lists(part_list)
-                                index += 1
-                        else:
-                            index += 1
-                    else:
-                        index += 1
-                else:
-                    index += 1
-
-                if index >= len(catalog.categories):
-                    state_while = False
-        else:
-            catalog.logger.warning(f'No Categories in {catalog}')
-
-
 class TestKvernelandCatalog(TestCatalogBase):
 
-    def test_tree(self, catalog, test_api):
-        if catalog.categories:
-            state_while = True
-            index = 0
-
-            while state_while:
-                categories = list(catalog.categories.values())
-
-                if test_api:
-                    categories = [list(catalog.categories.values())[index]]
-
-                level_1 = self.get_children(categories=categories, test_api=test_api)
-
-                if level_1:
-                    level_2 = self.get_children(categories=level_1, test_api=test_api)
-
-                    if level_2:
-                        if test_api:
-                            category = categories[0]
-                            category.add_part_lists(level_2)
-                            state_while = False
-                        else:
-                            for part_list in level_2:
-                                category = catalog.categories[part_list.root_id]
-                                category.add_part_lists(part_list)
-                            index += 1
-                    else:
-                        index += 1
-                else:
-                    index += 1
-
-                if index >= len(catalog.categories):
-                    state_while = False
-        else:
-            catalog.logger.warning(f'No Categories in {catalog}')
+    async def test_tree(self, catalog, test_api):
+        await super().test_tree(catalog, test_api)
 
 
 class TestRopaCatalog(TestCatalogBase):
 
-    def test_tree(self, catalog, test_api):
-        if catalog.categories:
-            state_while = True
-            index = 0
-
-            while state_while:
-                categories = list(catalog.categories.values())
-
-                if test_api:
-                    categories = [list(catalog.categories.values())[index]]
-
-                level_1 = self.get_children(categories=categories, test_api=test_api)
-
-                if level_1:
-                    level_2 = self.get_children(categories=level_1, test_api=test_api)
-
-                    if level_2:
-                        if test_api:
-                            category = categories[0]
-                            category.add_part_lists(level_2)
-                            state_while = False
-                        else:
-                            for part_list in level_2:
-                                category = catalog.categories[part_list.root_id]
-                                category.add_part_lists(part_list)
-                            index += 1
-                    else:
-                        index += 1
-                else:
-                    index += 1
-
-                if index >= len(catalog.categories):
-                    state_while = False
-        else:
-            catalog.logger.warning(f'No Categories in {catalog}')
+    async def test_tree(self, catalog, test_api):
+        await super().test_tree(catalog, test_api)
 
 
 class TestJdeereCatalog(TestCatalogBase):
 
-    def test_tree(self, catalog, test_api):
+    async def test_tree(self, catalog, test_api):
         if catalog.categories:
-            state_while = True
-            index = 0
+            categories = list(catalog.categories.values())
+            t = tqdm(
+                total=None,
+                desc='Process tree traversal and parlists retrieval',
+                bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
+            )
+            tasks = (asyncio.create_task(self.process_children(catalog=catalog, category=category, test_api=test_api, t=t, part_list=True)) for category in categories)
 
-            while state_while:
-                categories = list(catalog.categories.values())
-
-                if test_api:
-                    categories = [list(catalog.categories.values())[index]]
-
-                level_1 = self.get_children(categories=categories, test_api=test_api)
-
-                if level_1:
-                    level_2 = self.get_children(categories=level_1, test_api=test_api)
-
-                    if level_2:
-                        level_3 = self.get_children(categories=level_2, test_api=test_api, part_list=True)
-
-                        if level_3:
-                            if test_api:
-                                category = categories[0]
-                                category.add_part_lists(level_3)
-                                state_while = False
-                            else:
-                                for part_list in level_3:
-                                    category = catalog.categories[part_list.root_id]
-                                    category.add_part_lists(part_list)
-                                index += 1
-                        else:
-                            index += 1
-                    else:
-                        index += 1
-                else:
-                    index += 1
-
-                if index >= len(catalog.categories):
-                    state_while = False
+            try:
+                for task in asyncio.as_completed(tasks):
+                    await task
+            except Exception as error:
+                catalog.logger.error(error)
+            finally:
+                t.total = t.n
+                t.close()
         else:
             catalog.logger.warning(f'No Categories in {catalog}')
 
 
 class TestCatalog:
-    """class wrap for start test"""
+    """Class wrap for start test"""
 
     @staticmethod
     def _get_test_instance(catalog):

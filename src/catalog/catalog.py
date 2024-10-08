@@ -24,7 +24,7 @@ class Catalog(ABC):
         category_id = data.get('id')
         name = data.get(self.name_label_category)
         category = await create_category_instance(catalog=self, category_id=category_id, name=name)
-        await db_add_category(category_id=category_id, name=name)
+        await db_add_category(category_id=category_id, name=name, catalog_name=self.name)
         self.categories[category_id] = category
 
         return category
@@ -118,7 +118,10 @@ class LemkenCatalog(Catalog):
 
 
 class KubotaCatalog(Catalog):
-    pass
+
+    def __init__(self, name):
+        super(KubotaCatalog, self).__init__(name)
+        self.depth = 2
 
 
 class GrimmeCatalog(Catalog):
@@ -126,29 +129,45 @@ class GrimmeCatalog(Catalog):
     def __init__(self, name):
         super(GrimmeCatalog, self).__init__(name)
         self.name_label_category = 'label'
+        self.depth = 4
 
 
 class ClaasCatalog(Catalog):
-    pass
+
+    def __init__(self, name):
+        super(ClaasCatalog, self).__init__(name)
+        self.depth = 3
 
 
 class KroneCatalog(Catalog):
-    pass
+
+    def __init__(self, name):
+        super(KroneCatalog, self).__init__(name)
+        self.depth = 3
 
 
 class KvernelandCatalog(Catalog):
-    pass
+
+    def __init__(self, name):
+        super(KvernelandCatalog, self).__init__(name)
+        self.depth = 2
 
 
 class JdeereCatalog(Catalog):
-    pass
+
+    def __init__(self, name):
+        super(JdeereCatalog, self).__init__(name)
+        self.depth = 3
 
 
 class RopaCatalog(Catalog):
-    pass
+
+    def __init__(self, name):
+        super(RopaCatalog, self).__init__(name)
+        self.depth = 2
 
 
-def create_catalog_instance(catalog_name):
+async def create_catalog_instance(catalog_name):
     cls = globals().get(f"{catalog_name.capitalize()}Catalog")
     if cls is None:
         raise ValueError(f"Class {catalog_name.capitalize()}Catalog is not defined.")
@@ -156,20 +175,22 @@ def create_catalog_instance(catalog_name):
 
 
 if __name__ == '__main__':
-    catalog = create_catalog_instance(catalog_name='lemken')
-    # response = asyncio.run(catalog.get_tree())
-    # print(response)
-    # data = response.get('data')
-    # print('---------Categories------------------------------------------')
-    # print(f"колличество категорий: {len(data)}")
-    # print(f'type data : {type(data)}')
+    catalog = asyncio.run(create_catalog_instance(catalog_name='lemken'))
+    response = asyncio.run(catalog.fetch_tree())
+    data = response.get('data')
+    print('---------Categories------------------------------------------')
+    print(f"колличество категорий: {len(data)}")
+    print(f'type data : {type(data)}')
+    for category in data:
+        category_id = category.get('id')
+        print(category_id)
     # print('---------category[0]-------------------------------------------')
     # for key, val in data[0].items():
     #     print(f"{key}: {val}")
 
     # print('---------Subcategories-----------------')
-    # response = catalog.get_category(category_id=657132)
-    # data = response.json().get('data')
+    # response = asyncio.run(catalog.fetch_category(category_id=187339))
+    # data = response.get('data')
     # print(f"количество sub {len(data)}")
     # for el in data[:1]:
     #     for key, val in el.items():
@@ -193,15 +214,15 @@ if __name__ == '__main__':
     # for key, val in data[1].items():
     #     print(f"{key}: {val}")
     #
-    print('---------Parts------------------')
-    response = asyncio.run(catalog.fetch_parts(child_id=144236))
-    print(response)
-    data = response.get('data')
-    print(data)
-    print(f"len data: {len(data)}")
-    print('<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>..')
-    for el in data:
-        print(el)
+    # print('---------Parts------------------')
+    # response = asyncio.run(catalog.fetch_parts(part_list_id=143163))
+    # print(response)
+    # data = response.get('data')
+    # print(data)
+    # print(f"len data: {len(data)}")
+    # print('<<<<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>..')
+    # for el in data:
+    #     print(el)
 
 
 

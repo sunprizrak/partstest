@@ -1,5 +1,4 @@
 import pytest
-from src.catalog.catalog import create_catalog_instance
 
 
 def pytest_addoption(parser):
@@ -27,9 +26,12 @@ def pytest_generate_tests(metafunc):
 
 
 @pytest.fixture(scope='module')
-def catalog(request):
+async def catalog(request):
     catalog_name = request.param
-    catalog = create_catalog_instance(catalog_name=catalog_name)
+    from src.catalog.catalog import create_catalog_instance
+    catalog = await create_catalog_instance(catalog_name=catalog_name)
+    from database import add_catalog
+    await add_catalog(name=catalog_name)
     return catalog
 
 

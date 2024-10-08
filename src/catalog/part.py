@@ -83,8 +83,8 @@ class KubotaPart(Part):
         self.validation_image_fields = {'name', 's3'}
         self.validation_category_fields = {'id'}
 
-    async def validate(self, data: dict):
-        await super().validate(data=data)
+    async def validate(self, progress):
+        await super().validate(progress)
 
 
 class ClaasPart(Part):
@@ -98,8 +98,8 @@ class ClaasPart(Part):
         self.validation_image_fields = {'name', 's3'}
         self.validation_category_fields = {'id'}
 
-    async def validate(self, data: dict):
-        await super().validate(data=data)
+    async def validate(self, progress):
+        await super().validate(progress)
 
 
 class RopaPart(Part):
@@ -114,8 +114,8 @@ class RopaPart(Part):
         self.validation_image_fields = {'name', 's3'}
         self.validation_category_fields = {'id'}
 
-    async def validate(self, data: dict):
-        await super().validate(data=data)
+    async def validate(self, progress):
+        await super().validate(progress)
 
 
 class GrimmePart(Part):
@@ -128,8 +128,8 @@ class GrimmePart(Part):
             'updated_at',
         }
 
-    async def validate(self, data: dict):
-        await super().validate(data=data)
+    async def validate(self, progress):
+        await super().validate(progress)
 
 
 class KronePart(Part):
@@ -143,8 +143,8 @@ class KronePart(Part):
         self.validation_image_fields = {'name', 's3'}
         self.validation_category_fields = {'id'}
 
-    async def validate(self, data: dict):
-        await super().validate(data=data)
+    async def validate(self, progress):
+        await super().validate(progress)
 
 
 class KvernelandPart(Part):
@@ -158,8 +158,8 @@ class KvernelandPart(Part):
         self.validation_image_fields = {'name', 's3'}
         self.validation_category_fields = {'id'}
 
-    async def validate(self, data: dict):
-        await super().validate(data=data)
+    async def validate(self, progress):
+        await super().validate(progress)
 
 
 class JdeerePart(Part):
@@ -172,8 +172,8 @@ class JdeerePart(Part):
         }
         self.validation_category_fields = {'id'}
 
-    async def validate(self, data: dict):
-        await super().validate(data=data)
+    async def validate(self, progress):
+        await super().validate(progress)
 
 
 async def create_part_instance(catalog, category, part_id, name):
