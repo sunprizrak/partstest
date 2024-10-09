@@ -115,6 +115,7 @@ class LemkenCatalog(Catalog):
     def __init__(self, name):
         super(LemkenCatalog, self).__init__(name)
         self.depth = 2
+        self.part_list = False
 
 
 class KubotaCatalog(Catalog):
@@ -122,6 +123,7 @@ class KubotaCatalog(Catalog):
     def __init__(self, name):
         super(KubotaCatalog, self).__init__(name)
         self.depth = 2
+        self.part_list = False
 
 
 class GrimmeCatalog(Catalog):
@@ -130,6 +132,7 @@ class GrimmeCatalog(Catalog):
         super(GrimmeCatalog, self).__init__(name)
         self.name_label_category = 'label'
         self.depth = 4
+        self.part_list = False
 
 
 class ClaasCatalog(Catalog):
@@ -137,6 +140,7 @@ class ClaasCatalog(Catalog):
     def __init__(self, name):
         super(ClaasCatalog, self).__init__(name)
         self.depth = 3
+        self.part_list = False
 
 
 class KroneCatalog(Catalog):
@@ -144,6 +148,7 @@ class KroneCatalog(Catalog):
     def __init__(self, name):
         super(KroneCatalog, self).__init__(name)
         self.depth = 3
+        self.part_list = True
 
 
 class KvernelandCatalog(Catalog):
@@ -151,6 +156,7 @@ class KvernelandCatalog(Catalog):
     def __init__(self, name):
         super(KvernelandCatalog, self).__init__(name)
         self.depth = 2
+        self.part_list = False
 
 
 class JdeereCatalog(Catalog):
@@ -158,6 +164,7 @@ class JdeereCatalog(Catalog):
     def __init__(self, name):
         super(JdeereCatalog, self).__init__(name)
         self.depth = 3
+        self.part_list = True
 
 
 class RopaCatalog(Catalog):
@@ -165,6 +172,7 @@ class RopaCatalog(Catalog):
     def __init__(self, name):
         super(RopaCatalog, self).__init__(name)
         self.depth = 2
+        self.part_list = False
 
 
 async def create_catalog_instance(catalog_name):

@@ -22,16 +22,21 @@ class NoDataException(Exception):
 
 class CatalogTestUtility:
 
-    async def process_children(self, catalog, category, test_api, t, depth=1, part_list=None):
+    async def process_children(self, catalog, category, test_api, t, depth=1):
         if depth > catalog.depth:
             return
 
+        part_list = False
+
+        if depth == catalog.depth and catalog.part_list:
+            part_list = True
+
         async for child in category.fetch_children(test_api=test_api, part_list=part_list):
             if child:
-                t.set_postfix_str(f'{child} from {category}')
                 t.total = t.n * randint(2, 3)
-
+                t.set_postfix_str('...' * randint(1, 2))
                 if depth == catalog.depth:
+                    t.set_postfix_str(f'{child} from {category}')
                     t.update()
                     await add_parts_list(
                         root_id=child.root_id,
@@ -40,12 +45,7 @@ class CatalogTestUtility:
                         catalog_name=catalog.name,
                     )
 
-                depth += 1
-
-                if part_list and depth == category.catalog.depth:
-                    await self.process_children(catalog=catalog, category=child, test_api=test_api, t=t, depth=depth, part_list=part_list)
-                else:
-                    await self.process_children(catalog=catalog, category=child, test_api=test_api, t=t, depth=depth)
+                await self.process_children(catalog=catalog, category=child, test_api=test_api, t=t, depth=depth+1)
 
     async def process_fetch_parts_from_parts_lists(self, category_id, count, catalog_name):
         if 0 < count < 50:
@@ -241,25 +241,7 @@ class TestClaasCatalog(TestCatalogBase):
 class TestKroneCatalog(TestCatalogBase):
 
     async def test_tree(self, catalog, test_api):
-        if catalog.categories:
-            categories = list(catalog.categories.values())
-            t = tqdm(
-                total=None,
-                desc='Process tree traversal and parlists retrieval',
-                bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
-            )
-            tasks = (asyncio.create_task(self.process_children(catalog=catalog, category=category, test_api=test_api, t=t, part_list=True)) for category in categories)
-
-            try:
-                for task in asyncio.as_completed(tasks):
-                    await task
-            except Exception as error:
-                catalog.logger.error(error)
-            finally:
-                t.total = t.n
-                t.close()
-        else:
-            catalog.logger.warning(f'No Categories in {catalog}')
+        await super().test_tree(catalog, test_api)
 
 
 class TestKvernelandCatalog(TestCatalogBase):
@@ -277,25 +259,7 @@ class TestRopaCatalog(TestCatalogBase):
 class TestJdeereCatalog(TestCatalogBase):
 
     async def test_tree(self, catalog, test_api):
-        if catalog.categories:
-            categories = list(catalog.categories.values())
-            t = tqdm(
-                total=None,
-                desc='Process tree traversal and parlists retrieval',
-                bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
-            )
-            tasks = (asyncio.create_task(self.process_children(catalog=catalog, category=category, test_api=test_api, t=t, part_list=True)) for category in categories)
-
-            try:
-                for task in asyncio.as_completed(tasks):
-                    await task
-            except Exception as error:
-                catalog.logger.error(error)
-            finally:
-                t.total = t.n
-                t.close()
-        else:
-            catalog.logger.warning(f'No Categories in {catalog}')
+        await super().test_tree(catalog, test_api)
 
 
 class TestCatalog:
