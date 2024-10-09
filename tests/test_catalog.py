@@ -108,6 +108,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
         if catalog.categories:
             categories = list(catalog.categories.values())
             t = tqdm(
+                dynamic_ncols=True,
                 total=None,
                 desc='Process tree traversal and parlists retrieval',
                 bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
@@ -129,6 +130,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
         categories = list(catalog.categories.values())
 
         t = tqdm(
+            dynamic_ncols=True,
             total=0,
             desc='Process fetch parts',
             bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt} | {postfix}",
@@ -172,6 +174,7 @@ class TestCatalogBase(ABC, CatalogTestUtility):
             total_parts += await count_parts(category_id=category.id, catalog_name=catalog.name)
 
         t = tqdm(
+            dynamic_ncols=True,
             total=total_parts,
             desc='Process validation details',
             bar_format="{desc} | {elapsed} | : {bar:30} | {n_fmt}/{total_fmt} | {postfix}",
