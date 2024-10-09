@@ -4,7 +4,7 @@ import pytest
 from InquirerPy import inquirer
 from colorama import Fore, init
 from tqdm import tqdm
-from utility import update_spinner
+from utility import update_spinner, get_ip_address
 from database import initialize_db
 
 # Инициализация colorama
@@ -81,6 +81,8 @@ async def start_app():
             if brands:
                 level + 1
                 brands['Тест API для всех каталогов'] = f"-s -v tests/test_catalog.py::TestCatalog::test_root_categories tests/test_catalog.py::TestCatalog::test_tree tests/test_catalog.py::TestCatalog::test_parts --catalogs={','.join(brands.values())} --test_api --alluredir allure_results"
+                ip_address = await get_ip_address()
+                brands['Запустить Allure'] = f"allure serve --host {ip_address} --port 8080 allure_results"
                 level.add_menu(brands)
                 await open_menu()
             else:
@@ -117,6 +119,20 @@ async def open_menu(**kwargs):
         command = menu.get(choice).split()
         pytest.main(command)
         await open_menu()
+    elif choice == 'Запустить Allure':
+        command = menu.get(choice)
+        try:
+            process = await asyncio.create_subprocess_shell(command)
+            await process.wait()
+        except asyncio.CancelledError:
+            print("Allure был завершён. Возврат в меню.")
+            await open_menu()
+        except KeyboardInterrupt:
+            print("Процесс был прерван. Возврат в меню.")
+        except Exception as e:
+            print(f"Произошла ошибка при запуске Allure: {e}")
+        finally:
+            await open_menu()
     elif choice == '<<< назад >>>':
         level - 1
         if level > 0:

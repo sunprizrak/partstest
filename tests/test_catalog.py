@@ -2,6 +2,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from random import randint
 import nest_asyncio
+import pytest
 from colorama import Fore
 from tqdm.asyncio import tqdm
 from src.catalog.category import create_category_instance
