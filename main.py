@@ -5,7 +5,7 @@ from InquirerPy import inquirer
 from colorama import Fore, init
 from tqdm import tqdm
 from utility import update_spinner, get_ip_address
-from database import initialize_db
+from database import initialize_db, clear_db
 
 # Инициализация colorama
 init(autoreset=True)
@@ -119,6 +119,7 @@ async def open_menu(**kwargs):
         command = menu.get(choice).split()
         pytest.main(command)
         await open_menu()
+        await clear_db()
     elif choice == 'Запустить Allure':
         command = menu.get(choice)
         try:

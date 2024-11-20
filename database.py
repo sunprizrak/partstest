@@ -167,3 +167,12 @@ async def fetch_parts_batch(category_id, catalog_name, batch_size, offset):
                 (category_id, catalog_name, batch_size, offset)
         ) as cursor:
             return await cursor.fetchall()
+
+
+async def clear_db():
+    async with aiosqlite.connect('db.sqlite', timeout=30) as db:
+        await db.execute("DELETE FROM details;")
+        await db.execute("DELETE FROM parts_lists;")
+        await db.execute("DELETE FROM categories;")
+        await db.execute("DELETE FROM catalogs;")
+        await db.commit()
