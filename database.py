@@ -2,57 +2,56 @@ import aiosqlite
 import os
 
 
-if os.path.exists('db.sqlite'):
-    os.remove('db.sqlite')
-
-
 async def initialize_db():
-    async with aiosqlite.connect('db.sqlite', timeout=30) as db:
-        await db.execute(
-            '''
-                CREATE TABLE IF NOT EXISTS catalogs (
-                    catalog_name TEXT PRIMARY KEY
-                )
-            '''
-        )
+    if os.path.exists('db.sqlite'):
+        await clear_db()
+    else:
+        async with aiosqlite.connect('db.sqlite', timeout=30) as db:
+            await db.execute(
+                '''
+                    CREATE TABLE IF NOT EXISTS catalogs (
+                        catalog_name TEXT PRIMARY KEY
+                    )
+                '''
+            )
 
-        await db.execute(
-            '''
-                CREATE TABLE IF NOT EXISTS categories (
-                    category_id INTEGER,
-                    name TEXT,
-                    catalog_name TEXT,
-                    PRIMARY KEY (category_id, catalog_name),
-                    FOREIGN KEY (catalog_name) REFERENCES catalogs(catalog_name)
-                )
-            '''
-        )
+            await db.execute(
+                '''
+                    CREATE TABLE IF NOT EXISTS categories (
+                        category_id INTEGER,
+                        name TEXT,
+                        catalog_name TEXT,
+                        PRIMARY KEY (category_id, catalog_name),
+                        FOREIGN KEY (catalog_name) REFERENCES catalogs(catalog_name)
+                    )
+                '''
+            )
 
-        await db.execute(
-            '''
-                CREATE TABLE IF NOT EXISTS parts_lists (
-                    parts_list_id INTEGER PRIMARY KEY,
-                    root_id INTEGER,
-                    name TEXT,
-                    catalog_name TEXT,
-                    FOREIGN KEY (root_id, catalog_name) REFERENCES categories(category_id, catalog_name)
-                )
-            '''
-        )
+            await db.execute(
+                '''
+                    CREATE TABLE IF NOT EXISTS parts_lists (
+                        parts_list_id INTEGER PRIMARY KEY,
+                        root_id INTEGER,
+                        name TEXT,
+                        catalog_name TEXT,
+                        FOREIGN KEY (root_id, catalog_name) REFERENCES categories(category_id, catalog_name)
+                    )
+                '''
+            )
 
-        await db.execute(
-            '''
-                CREATE TABLE IF NOT EXISTS details (
-                    detail_id INTEGER PRIMARY KEY,
-                    category_id INTEGER,
-                    catalog_name TEXT,
-                    name TEXT,
-                    FOREIGN KEY (category_id, catalog_name) REFERENCES categories(category_id, catalog_name)
-                )
-            '''
-        )
+            await db.execute(
+                '''
+                    CREATE TABLE IF NOT EXISTS details (
+                        detail_id INTEGER PRIMARY KEY,
+                        category_id INTEGER,
+                        catalog_name TEXT,
+                        name TEXT,
+                        FOREIGN KEY (category_id, catalog_name) REFERENCES categories(category_id, catalog_name)
+                    )
+                '''
+            )
 
-        await db.commit()
+            await db.commit()
 
 
 async def add_catalog(name: str):

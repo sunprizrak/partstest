@@ -116,10 +116,14 @@ async def open_menu(**kwargs):
     ).execute_async()
 
     if choice.lower()[:4] == 'тест':
-        command = menu.get(choice).split()
-        pytest.main(command)
-        await open_menu()
-        await clear_db()
+        try:
+            await clear_db()
+            command = menu.get(choice).split()
+            pytest.main(command)
+        except SystemExit as error:
+            print(f"Pytest завершён с кодом: {error.code}")
+        finally:
+            await open_menu()
     elif choice == 'Запустить Allure':
         command = menu.get(choice)
         try:
